@@ -16,29 +16,22 @@ const authenticate = require("./middlewares/auth");
 const router = express.Router();
 
 
-const authenticateSession = (req, res, next) => {
-  if (!req.session.user) {
-    return res.status(401).json({ error: "Unauthorized access." });
-  }
-  next();
-};
 
-router.get("/profile", authenticateSession, getProfilePage);
 
 
 
 router.get("/", getHomePage);
-
 router.get("/sign", getSignPage);
 router.get("/login", getLoginPage);
 
-router.get("/profile", authenticate, getProfilePage);
 
 router.post("/register", registerUser);
 router.post("/login", loginUser);
-router.get("/profile", getProfile);
-router.get("/users", getUsers);
-router.put("/users/:id", updateUser); 
-router.delete("/users/:id", deleteUser); 
+
+// Protected routes (require JWT authentication)
+router.get("/profile", authenticate, getProfile);
+router.get("/users", authenticate, getUsers);
+router.put("/users/:id", authenticate, updateUser);
+router.delete("/users/:id", authenticate, deleteUser);
 
 module.exports = router;

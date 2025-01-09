@@ -1,17 +1,16 @@
 
 const mongoose = require('mongoose');
+require("dotenv").config();
 
 const connectDB = async () => {
   try {
-    
-    await mongoose.connect("mongodb+srv://Nurkanat:Nurkanat05@kazdiscover.vkucv.mongodb.net/?retryWrites=true&w=majority&appName=KazDiscover", {
+    await mongoose.connect(process.env.DB_URI, {
       
     });
-
-    console.log("Подключение к базе данных MongoDB успешно!");
+    console.log("Database connected");
   } catch (err) {
-    console.error("Ошибка подключения к базе данных MongoDB", err);
-    process.exit(1); 
+    console.error("Database connection error:", err);
+    process.exit(1);
   }
 };
 

@@ -1,14 +1,16 @@
 const jwt = require("jsonwebtoken");
 
+const JWT_SECRET = process.env.JWT_SECRET || "Bakdaulet";
+
 const authenticate = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const token = req.cookies.token || req.headers.authorization?.split(" ")[1]; // Check cookies or headers
   if (!token) {
     return res.status(401).json({ error: "Access denied. No token provided." });
   }
 
   try {
-    const decoded = jwt.verify(token, "your_secret_key");
-    req.user = decoded; // Store user info in req for later use
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded; // Attach user data to the request
     next();
   } catch (err) {
     res.status(400).json({ error: "Invalid token." });

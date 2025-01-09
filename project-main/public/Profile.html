@@ -262,48 +262,38 @@
   </div>
 
   <!-- Подключаем Bootstrap JS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+  
 
   <!-- Скрипт для запроса к /profile -->
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // 1) Получаем username из URL-параметра, если есть
-      const params = new URLSearchParams(window.location.search);
-      const username = params.get("username"); 
-      // Например, если страница: http://localhost:3000/Profile.html?username=Kasik
-      // то username = "Kasik"
+    document.addEventListener("DOMContentLoaded", async () => {
+  const token = localStorage.getItem("token");
+  if (!token) {
+    alert("You are not logged in.");
+    window.location.href = "/login";
+    return;
+  }
 
-      // Если username не передан, можно предупредить юзера
-      if (!username) {
-        alert("Не указан username в URL, вы не авторизованы.");
-        return; // останавливаемся
-      }
+  const response = await fetch("/profile", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 
-      // 2) Отправляем GET-запрос на /profile?username=ИмяПользователя
-      fetch(`/profile?username=${username}`)
-        .then((response) => {
-          if (!response.ok) {
-            // Если код ответа не 2xx
-            throw response;
-          }
-          return response.json();
-        })
-        .then((data) => {
-          // data = { message: "Добро пожаловать в профиль, Kasik." }
-          console.log("Успешно:", data);
-          alert(data.message); // или отобразить на странице, как хотите
-        })
-        .catch(async (errResp) => {
-          let errMsg = "Ошибка при запросе профиля.";
-          if (errResp.json) {
-            const errData = await errResp.json();
-            if (errData.error) {
-              errMsg = errData.error;
-            }
-          }
-          alert(errMsg);
-        });
-    });
+  if (!response.ok) {
+    const data = await response.json();
+    if (data.error === "Invalid token.") {
+      alert("Your session has expired. Please log in again.");
+      localStorage.removeItem("token"); // Clear the invalid token
+      window.location.href = "/login"; // Redirect to login page
+    } else {
+      alert(data.error || "Failed to fetch profile.");
+    }
+    return;
+  }
+
+  const data = await response.json();
+  console.log("Profile data:", data);
+  // Update the profile page with the user data
+});
   </script>
 </body>
 </html>

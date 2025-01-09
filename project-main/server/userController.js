@@ -4,20 +4,14 @@ const path = require("path");
 const User = require("./models/Users.js");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+// userController.js
+const JWT_SECRET = "Bakdaulet";
 
-const JWT_SECRET = "your_secret_key";
-
-const bcrypt = require("bcrypt");
-
-
-const usersFile = path.join(__dirname, "users.json");
-
-if (!fs.existsSync(usersFile)) {
-  fs.writeFileSync(usersFile, JSON.stringify([]));
+if (!JWT_SECRET) {
+  console.error("JWT_SECRET is not defined in the environment variables.");
+  process.exit(1); // Exit if the secret is not defined
 }
 
-const readUsers = () => JSON.parse(fs.readFileSync(usersFile));
-const writeUsers = (users) => fs.writeFileSync(usersFile, JSON.stringify(users, null, 2));
 
 exports.getHomePage = (req, res) => {
   res.sendFile(path.join(__dirname, "../public", "index.html"));
@@ -45,6 +39,13 @@ exports.registerUser = async (req, res) => {
   }
 
   try {
+    // Check if the email already exists
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
+      return res.status(409).json({ error: "Email is already registered." });
+    }
+
+    // Check if the username already exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(409).json({ error: "Username is already taken." });
@@ -56,8 +57,25 @@ exports.registerUser = async (req, res) => {
     const newUser = new User({ username, password: hashedPassword, email, age });
     await newUser.save();
 
-    return res.redirect("/");
+
+    // Generate JWT token
+    const token = jwt.sign({ userId: newUser._id, username: newUser.username }, JWT_SECRET, {
+      expiresIn: "1h", // Token expires in 1 hour
+    });
+
+    // Set the token in a cookie
+    res.cookie("token", token, { httpOnly: true, maxAge: 3600000 }); // 1 hour
+
+
+
+
+    return res.redirect("/Login.html");
+
   } catch (err) {
+    if (err.code === 11000) {
+      // MongoDB duplicate key error
+      return res.status(409).json({ error: "Email or username already exists." });
+    }
     console.error("Registration error:", err);
     return res.status(500).json({ error: "Server error. Please try again later." });
   }
@@ -84,16 +102,17 @@ exports.loginUser = async (req, res) => {
       return res.status(401).json({ error: "Invalid username or password." });
     }
 
-    // Create a JWT token
+    // Generate JWT token
     const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET, {
-      expiresIn: 120000, // Token expires in 2 min
+      expiresIn: "1h", // Token expires in 1 hour
     });
 
-    //req.session.user = { id: user._id, username: user.username };
-    return res.status(200).json({
-      message: "Login successful.",
-      user: { username: user.username, email: user.email, age: user.age },
-    });
+    // Set the token in a cookie
+    res.cookie("token", token, { httpOnly: true, maxAge: 3600000 }); // 1 hour
+
+    
+    return res.redirect("/");
+
   } catch (err) {
     console.error("Login error:", err);
     return res.status(500).json({ error: "Server error. Please try again later." });
@@ -102,16 +121,18 @@ exports.loginUser = async (req, res) => {
 
 
 
-exports.getProfile = (req, res) => {
-  const { username } = req.query;
-  if (!username) {
-    return res.status(401).json({ error: "Вы не авторизованы. Войдите в систему." });
+// Get user profile
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("-password"); // Exclude password
+    if (!user) {
+      return res.status(404).json({ error: "User not found." });
+    }
+    res.status(200).json({ user });
+  } catch (err) {
+    console.error("Profile error:", err);
+    res.status(500).json({ error: "Server error. Please try again later." });
   }
-  const users = readUsers();
-  if (!users.some((u) => u.username === username)) {
-    return res.status(404).json({ error: "Пользователь не найден." });
-  }
-  res.status(200).json({ message: `Добро пожаловать в профиль, ${username}.` });
 };
 
 exports.getUsers = (req, res) => {
