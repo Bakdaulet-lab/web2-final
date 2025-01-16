@@ -1,135 +1,89 @@
- <!--index.html-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="index.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
-    <title>Travel Guide</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trip Planning</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="https://maps.gomaps.pro/maps/api/js?key=AlzaSyO8IHiUlDUSdrBHiOSWRrZdpiqQvan6afi&callback=initMap" async defer></script>
+  <link rel="stylesheet" href="styles/trip-planning.css">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="gradient-background" style="font-family: Quicksand, sans-serif">
+<body class="bg-gray-100">
+  <div class="container mx-auto p-6">
+    <!-- Header -->
+    <header class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-blue-600">Plan Your Trip</h1>
+      <p class="text-gray-600">Search for destinations, attractions, and activities.</p>
+    </header>
 
-    <nav class="navbar navbar-dark bg-dark" aria-label="First navbar example">
-        <div class="container-fluid">
-          <a class="navbar-brand" href="#">Home</a>
-          <button class="navbar-toggler collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#navbarsExample01" aria-controls="navbarsExample01" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-          </button>
-          <div class="navbar-collapse collapse" id="navbarsExample01">
-            <ul class="navbar-nav me-auto mb-2">
-              <li class="nav-item">
-                <a class="nav-link active" aria-current="page" href="Signin.html">Sign In</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="Login.html">Log In</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="Profile.html">Profile</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="Quiz.html">Quiz</a>
-              </li>
-            </ul>
-          </div>
-        </div>
-    </nav>
-
-    <div class="hero-section text-center text-white d-flex justify-content-center align-items-center mx-auto" style="background-image: url('back.jpeg'); margin-top: 2rem; height: 100vh; aspect-ratio: 16 / 9; background-size: cover; background-position: center; border-radius: 2rem; box-shadow: 0 1.5rem 3rem -0.75rem hsla(0, 0%, 0%, 0.25);">
-        <div>
-            <h1 class="display-4 fw-bold">KazDiscover</h1>
-            <p class="lead">Visit your dreams with us</p>
-        </div>
-    </div>    
-
-    <div class="container my-5">
-
-        <h1 class="text-center fw-bold display-4 mb-5">Why us?</h1>
-
-
-        <div class="row justify-content-center">
-            <div class="col-lg-4 text-center">
-                <div class="rounded-circle bg-black d-flex justify-content-center align-items-center mx-auto" style="width: 150px; height: 150px;">
-                    <i class="bi bi-shield-check text-white" style="font-size: 3rem;"></i>
-                </div>
-                <h2 class="fw-normal mt-3 fs-7">Reliability</h2>
-                <p class="fs-5">We have been on the market for over 20 years, and during this time we have received over 100,000 positive reviews from our clients, which confirms the high quality of our services.</p>
-            </div>
-            <div class="col-lg-4 text-center">
-                <div class="rounded-circle bg-black d-flex justify-content-center align-items-center mx-auto" style="width: 150px; height: 150px;">
-                    <i class="bi bi-person-badge text-white" style="font-size: 3rem;"></i>
-                </div>
-                <h2 class="fw-normal mt-3 fs-7">Professionalism</h2>
-                <p class="fs-5">Our staff are experienced professionals who constantly improve their skills to provide the highest level of service. Their commitment to excellence is a guarantee of your comfort and trust.</p>
-            </div>
-            <div class="col-lg-4 text-center">
-                <div class="rounded-circle bg-black d-flex justify-content-center align-items-center mx-auto" style="width: 150px; height: 150px;">
-                    <i class="bi bi-stars text-white" style="font-size: 3rem;"></i>
-                </div>
-                <h2 class="fw-normal mt-3 fs-7">Unforgettable emotions</h2>
-                <p class="fs-5">We create not just services, but unique experiences that give unforgettable emotions. Each of our offers is thought out to the smallest detail to turn an ordinary day into a bright event.</p>
-            </div>
-        </div>
-    </div>    
-
-    <section class="container">
-        <div class="slider-wrapper">
-            <div class="slider" id="slider">
-
-                <div class="slide" id="slide1">
-                    <img src="alakol.jpg" alt="alakol">
-                    <div class="caption">
-                        <h2>Alakol Lake</h2>
-                        <p>Alakol Lake, located between Kazakhstan and China, offers stunning views with its turquoise waters and surrounding mountains.</p>
-                    </div>
-                    <a href="alakol.html" class="learn-more">Learn More</a>
-                </div>
-
-                <div class="slide" id="slide2">
-                    <img src="burabay.jpg" alt="burabay">
-                    <div class="caption">
-                        <h2>Burabay</h2>
-                        <p>Burabay, often called the "Kazakhstan's Swiss Alps," located in the northern part of the country, surrounded by lush forests and crystal-clear lakes</p>
-                    </div>
-                    <a href="burabay.html" class="learn-more">Learn More</a>
-                </div>
-
-                <div class="slide" id="slide3">
-                    <img src="mangistau.jpg" alt="mangistau">
-                    <div class="caption">
-                        <h2>Mangistau</h2>
-                        <p>Mangistau, a breathtaking region in western Kazakhstan, is known for its unique desert landscapes, towering cliffs, and ancient rock formations.</p>
-                    </div>
-                    <a href="mangistau.html" class="learn-more">Learn More</a>
-                </div>
-            </div>
-
-            <div class="dots" id="dots">
-                <a href="#slide1" data-slide="0" class="dot"></a>
-                <a href="#slide2" data-slide="1" class="dot"></a>
-                <a href="#slide3" data-slide="2" class="dot"></a>
-            </div>
-        </div>
-    </section>
-    
-    <div class="container">
-        <footer class="py-3 my-4">
-          <ul class="nav justify-content-center border-bottom pb-3 mb-3">
-            <li class="nav-item"><a href="index.html" class="nav-link px-2 text-body-secondary">Home</a></li>
-            <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Features</a></li>
-            <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">Pricing</a></li>
-            <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">FAQs</a></li>
-            <li class="nav-item"><a href="#" class="nav-link px-2 text-body-secondary">About</a></li>
-          </ul>
-          <p class="text-center text-body-secondary">© 2024 Company, Inc</p>
-        </footer>
+    <!-- Search Bar -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <div class="flex gap-4">
+        <input
+          type="text"
+          id="destination"
+          placeholder="Enter destination"
+          class="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          id="searchBtn"
+          class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 focus:outline-none"
+        >
+          Search
+        </button>
       </div>
+    </div>
 
-    <script src="index.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <!-- Filters -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <select
+          id="budget"
+          class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select Budget</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+
+        <select
+          id="duration"
+          class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select Duration</option>
+          <option value="1-3">1-3 Days</option>
+          <option value="4-7">4-7 Days</option>
+          <option value="7+">7+ Days</option>
+        </select>
+
+        <select
+          id="interest"
+          class="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Select Interest</option>
+          <option value="adventure">Adventure</option>
+          <option value="family-friendly">Family-Friendly</option>
+          <option value="luxury">Luxury</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <div id="map" class="h-96 rounded-lg"></div>
+    </div>
+
+    <!-- Attractions List -->
+    <div class="bg-white p-6 rounded-lg shadow-md">
+      <h2 class="text-2xl font-bold mb-4">Attractions</h2>
+      <div id="attractionsList" class="space-y-4">
+        <!-- Attractions will be dynamically added here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="scripts/trip-planning.js"></script>
 </body>
 </html>

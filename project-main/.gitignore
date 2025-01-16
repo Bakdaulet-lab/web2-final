@@ -1,2 +1,13 @@
 server/node_modules
 .env
+travel-platform/build/
+
+# IDE and editor files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# macOS
+.DS_Store

@@ -4,7 +4,10 @@ const path = require("path");
 const User = require("./models/Users.js");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-// userController.js
+const nodemailer = require("nodemailer");
+const axios = require("axios");
+
+
 const JWT_SECRET = "Bakdaulet";
 
 if (!JWT_SECRET) {
@@ -118,6 +121,112 @@ exports.loginUser = async (req, res) => {
     return res.status(500).json({ error: "Server error. Please try again later." });
   }
 };
+
+
+
+// Process booking
+exports.processBooking = async (req, res) => {
+  const { userId, excursionId, flightId, accommodationId } = req.body;
+
+  // Save booking to database (pseudo-code)
+  const booking = await saveBookingToDatabase(userId, excursionId, flightId, accommodationId);
+
+  res.status(200).json({ message: "Booking successful", booking });
+};
+
+// Send confirmation email
+exports.sendConfirmationEmail = async (req, res) => {
+  const { email, bookingDetails } = req.body;
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Booking Confirmation",
+    text: `Your booking details: ${JSON.stringify(bookingDetails)}`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      return res.status(500).json({ error: "Failed to send email" });
+    }
+    res.status(200).json({ message: "Email sent", info });
+  });
+};
+
+
+
+exports.generateItinerary = async (req, res) => {
+  const { userId, preferences } = req.body;
+
+  // Generate itinerary based on preferences (pseudo-code)
+  const itinerary = await generateItineraryFromPreferences(userId, preferences);
+
+  res.status(200).json({ itinerary });
+};
+
+exports.updateItinerary = async (req, res) => {
+  const { itineraryId, updates } = req.body;
+
+  // Update itinerary in database (pseudo-code)
+  const updatedItinerary = await updateItineraryInDatabase(itineraryId, updates);
+
+  res.status(200).json({ updatedItinerary });
+};
+
+
+
+// Fetch flights
+exports.fetchFlights = async (req, res) => {
+  const { origin, destination, date } = req.query;
+
+  if (!origin || !destination || !date) {
+    return res.status(400).json({ error: "dest origin and date required" });
+  }
+
+  try {
+    const response = await axios.get(`https://opensky-network.org/api/states/all`, {
+      params: { origin, destination, date },
+      headers: { Authorization: `JWT ${process.env.JWT_SECRET}` },
+    });
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error fetching flights:", error.message);
+    res.status(500).json({ error: "Failed to fetch flights" });
+  }
+};
+
+// Fetch hotels
+exports.fetchHotels = async (req, res) => {
+  const { location, checkIn, checkOut } = req.query;
+
+  if (!location || !checkIn || !checkOut) {
+    return res.status(400).json({ error: "Location, check-in, and check-out dates are required" });
+  }
+
+  try {
+    const response = await axios.get(`https://api.makcorps.com/free/${location}`, {
+      params: { checkIn, checkOut },
+      headers: { Authorization: `JWT ${process.env.JWT_SECRET}` },
+    });
+
+    res.status(200).json(response.data);
+  } catch (error) {
+    console.error("Error fetching hotels:", error.message);
+    res.status(500).json({ error: "Failed to fetch hotels" });
+  }
+};
+
+
+
 
 
 

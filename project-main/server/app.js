@@ -4,6 +4,7 @@ const path = require("path");
 const routes = require("./routes"); 
 const connectDB = require("./db");
 const cookieParser = require("cookie-parser");
+const cors = require("cors");
 
 require("dotenv").config(); 
 
@@ -16,13 +17,20 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "../public")));
 
+// Middleware
+app.use(cors());
+app.use(express.json());
 
 connectDB();
 
 
 
+// API routes
+app.use("/api", routes);
 
-app.use(routes);
+
+
+
 
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
