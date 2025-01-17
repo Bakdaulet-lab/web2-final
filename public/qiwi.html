@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QIWI Wallet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-3xl font-bold text-center mb-8">QIWI Wallet</h1>
+
+        <!-- Check Balance -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold mb-4">Check Balance</h2>
+            <button id="checkBalanceBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Check Balance
+            </button>
+            <p id="balanceResult" class="mt-4 text-gray-700"></p>
+        </div>
+
+        <!-- Send Payment -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-xl font-semibold mb-4">Send Payment</h2>
+            <form id="sendPaymentForm" class="space-y-4">
+                <div>
+                    <label for="recipientWallet" class="block text-gray-700">Recipient Wallet</label>
+                    <input type="text" id="recipientWallet" name="recipientWallet" class="w-full p-2 border rounded" required>
+                </div>
+                <div>
+                    <label for="amount" class="block text-gray-700">Amount</label>
+                    <input type="number" id="amount" name="amount" class="w-full p-2 border rounded" required>
+                </div>
+                <button type="submit" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Send Payment
+                </button>
+            </form>
+            <p id="paymentResult" class="mt-4 text-gray-700"></p>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Transaction History</h2>
+            <button id="getTransactionsBtn" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                Get Transactions
+            </button>
+            <div id="transactionsResult" class="mt-4 text-gray-700"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api'; 
+
+        // Check Balance
+        document.getElementById('checkBalanceBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/payments/balance`);
+                const data = await response.json();
+                document.getElementById('balanceResult').textContent = `Balance: ${JSON.stringify(data)}`;
+            } catch (error) {
+                console.error('Error checking balance:', error);
+                document.getElementById('balanceResult').textContent = 'Failed to check balance';
+            }
+        });
+
+        // Send Payment
+        document.getElementById('sendPaymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const recipientWallet = document.getElementById('recipientWallet').value;
+            const amount = document.getElementById('amount').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/payments/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ recipientWallet, amount }),
+                });
+                const data = await response.json();
+                document.getElementById('paymentResult').textContent = `Payment Result: ${JSON.stringify(data)}`;
+            } catch (error) {
+                console.error('Error sending payment:', error);
+                document.getElementById('paymentResult').textContent = 'Failed to send payment';
+            }
+        });
+
+        // Get Transaction History
+        document.getElementById('getTransactionsBtn').addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/payments/transactions`);
+                const data = await response.json();
+                document.getElementById('transactionsResult').textContent = `Transactions: ${JSON.stringify(data)}`;
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+                document.getElementById('transactionsResult').textContent = 'Failed to fetch transactions';
+            }
+        });
+    </script>
+</body>
+</html>
