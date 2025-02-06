@@ -1,0 +1,82 @@
+excursion 
+{
+  "name": "Grand Canyon Tour",
+  "description": "A breathtaking guided tour of the Grand Canyon, including scenic viewpoints and historical insights.",
+  "location": "Arizona, USA",
+  "price": 120,
+  "duration": "5 hours",
+  "images": [
+    "https://example.com/images/grandcanyon1.jpg",
+    "https://example.com/images/grandcanyon2.jpg"
+  ]
+}
+
+
+attrac
+{
+  "name": "Eiffel Tower",
+  "description": "A world-famous iron lattice tower in Paris, France, offering breathtaking city views.",
+  "location": "Paris, France",
+  "images": [
+    "https://example.com/images/eiffel1.jpg",
+    "https://example.com/images/eiffel2.jpg"
+  ],
+  "reviews": [
+    {
+      "userId": "65c1234abcd56789ef012345",
+      "rating": 5,
+      "comment": "Amazing view! A must-visit place.",
+      "date": "2024-01-31T12:00:00Z"
+    },
+    {
+      "userId": "65c6789abcd12345ef067890",
+      "rating": 4,
+      "comment": "Beautiful, but very crowded.",
+      "date": "2024-01-30T15:30:00Z"
+    }
+  ]
+}
+
+
+accomidation 
+{
+    "name": "Ocean View Hotel",
+    "location": "Miami, FL",
+    "type": "Hotel",
+    "pricePerNight": 150,
+    "amenities": ["WiFi", "Pool", "Gym", "Breakfast Included"],
+    "images": ["https://example.com/images/oceanview1.jpg", "https://example.com/images/oceanview2.jpg"]
+}
+
+flight
+{
+  "airline": "Emirates",
+  "flightNumber": "EK202",
+  "origin": "Dubai, UAE",
+  "destination": "New York, USA",
+  "departureTime": "2024-03-15T08:30:00Z",
+  "arrivalTime": "2024-03-15T18:00:00Z",
+  "price": 950
+}
+
+itinerary
+{
+  "userId": "65c1234abcd56789ef012345",
+  "destination": "Tokyo, Japan",
+  "startDate": "2024-04-10T00:00:00Z",
+  "endDate": "2024-04-20T00:00:00Z",
+  "activities": [
+    {
+      "name": "Shibuya Crossing Visit",
+      "description": "Experience the world's busiest pedestrian crossing in Shibuya.",
+      "date": "2024-04-11T14:00:00Z"
+    },
+    {
+      "name": "Mt. Fuji Day Trip",
+      "description": "A guided tour to Mount Fuji with breathtaking views and cultural insights.",
+      "date": "2024-04-15T08:00:00Z"
+    }
+  ]
+}
+
+

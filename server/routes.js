@@ -145,3 +145,5 @@ router.delete("/accommodations/:accommodationId", deleteAccommodation);
 
 
 module.exports = router;
+
+

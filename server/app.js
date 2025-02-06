@@ -1,3 +1,4 @@
+//app.js
 const express = require("express");
 const bodyParser = require("body-parser");
 const path = require("path");
@@ -37,5 +38,4 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`Сервер запущен на http://localhost:${PORT}`);
 });
-
 
