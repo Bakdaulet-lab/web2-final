@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/payment.html" class="nav-link active">Payments</a>
+                <a href="/pages/profile.html" class="nav-link">Profile</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="payment-container">
+            <div class="payment-section">
+                <h2>Wallet Balance</h2>
+                <div id="balanceInfo" class="balance-info">
+                    Loading balance...
+                </div>
+            </div>
+
+            <div class="payment-section">
+                <h2>Send Payment</h2>
+                <form id="paymentForm" class="form-container">
+                    <div class="form-group">
+                        <label for="recipientWallet" class="form-label">Recipient Wallet</label>
+                        <input type="text" id="recipientWallet" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount" class="form-label">Amount</label>
+                        <input type="number" id="amount" class="form-input" min="1" step="0.01" required>
+                    </div>
+                    <button type="submit" class="btn">Send Payment</button>
+                </form>
+            </div>
+
+            <div class="payment-section">
+                <h2>Transaction History</h2>
+                <div id="transactionHistory" class="transaction-list">
+                    Loading transactions...
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/payment.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+
+            try {
+                // Load wallet balance
+                const balance = await PaymentService.checkBalance();
+                document.getElementById('balanceInfo').innerHTML = `
+                    <h3>Current Balance: $${balance.accounts[0].balance.amount}</h3>
+                `;
+
+                // Load transaction history
+                const transactions = await PaymentService.getTransactionHistory();
+                const transactionsHtml = transactions.data.map(transaction => `
+                    <div class="transaction-item">
+                        <p>Amount: $${transaction.sum.amount}</p>
+                        <p>Date: ${new Date(transaction.date).toLocaleDateString()}</p>
+                        <p>Status: ${transaction.status}</p>
+                    </div>
+                `).join('');
+                document.getElementById('transactionHistory').innerHTML = transactionsHtml;
+            } catch (error) {
+                console.error('Error loading payment information:', error);
+                alert('Failed to load payment information.');
+            }
+
+            // Handle payment form submission
+            document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const recipientWallet = document.getElementById('recipientWallet').value;
+                const amount = document.getElementById('amount').value;
+
+                try {
+                    await PaymentService.sendPayment(recipientWallet, amount);
+                    alert('Payment sent successfully!');
+                    location.reload();
+                } catch (error) {
+                    console.error('Payment failed:', error);
+                    alert('Failed to send payment. Please try again.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

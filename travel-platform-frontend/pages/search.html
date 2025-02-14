@@ -1,0 +1,168 @@
+/search.html 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/search.html" class="nav-link active">Search</a>
+                <a href="/pages/profile.html" class="nav-link">Profile</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="search-container">
+            <div class="search-header">
+                <h2>Search Your Next Adventure</h2>
+            </div>
+
+            <div class="search-form-container">
+                <form id="searchForm" class="search-form">
+                    <div class="search-row">
+                        <div class="form-group">
+                            <label for="destination">Destination</label>
+                            <input type="text" id="destination" class="form-input" placeholder="Where do you want to go?">
+                        </div>
+                        <div class="form-group">
+                            <label for="dates">Dates</label>
+                            <div class="date-inputs">
+                                <input type="date" id="startDate" class="form-input">
+                                <span>to</span>
+                                <input type="date" id="endDate" class="form-input">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="travelers">Travelers</label>
+                            <input type="number" id="travelers" class="form-input" min="1" value="1">
+                        </div>
+                        <button type="submit" class="btn">Search</button>
+                    </div>
+
+                    <div class="filters">
+                        <div class="filter-group">
+                            <label>Type:</label>
+                            <div class="checkbox-group">
+                                <label><input type="checkbox" name="type" value="flight"> Flights</label>
+                                <label><input type="checkbox" name="type" value="hotel"> Hotels</label>
+                                <label><input type="checkbox" name="type" value="activity"> Activities</label>
+                            </div>
+                        </div>
+                        <div class="filter-group">
+                            <label>Price Range:</label>
+                            <select id="priceRange" class="form-input">
+                                <option value="">All Prices</option>
+                                <option value="budget">Budget</option>
+                                <option value="moderate">Moderate</option>
+                                <option value="luxury">Luxury</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div id="searchResults" class="search-results">
+                <!-- Results will be loaded here -->
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/apiClient.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            const searchForm = document.getElementById('searchForm');
+            searchForm.addEventListener('submit', handleSearch);
+
+            // Add debounced destination search
+            const destinationInput = document.getElementById('destination');
+            let timeout;
+            destinationInput.addEventListener('input', (e) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => searchDestinations(e.target.value), 300);
+            });
+        }
+
+        async function searchDestinations(query) {
+            if (!query) return;
+
+            try {
+                const results = await ApiClient.searchDestinations(query);
+                displayDestinationSuggestions(results);
+            } catch (error) {
+                console.error('Error searching destinations:', error);
+            }
+        }
+
+        function displayDestinationSuggestions(destinations) {
+            // Implementation for displaying destination suggestions
+        }
+
+        async function handleSearch(e) {
+            e.preventDefault();
+            
+            const searchData = {
+                destination: document.getElementById('destination').value,
+                startDate: document.getElementById('startDate').value,
+                endDate: document.getElementById('endDate').value,
+                travelers: document.getElementById('travelers').value,
+                types: Array.from(document.querySelectorAll('input[name="type"]:checked'))
+                    .map(input => input.value),
+                priceRange: document.getElementById('priceRange').value
+            };
+
+            try {
+                // Implement your search logic here
+                displaySearchResults([]);
+            } catch (error) {
+                console.error('Search error:', error);
+                alert('Failed to perform search. Please try again.');
+            }
+        }
+
+        function displaySearchResults(results) {
+            const resultsContainer = document.getElementById('searchResults');
+            if (!results.length) {
+                resultsContainer.innerHTML = '<p>No results found. Try different search criteria.</p>';
+                return;
+            }
+
+            resultsContainer.innerHTML = results.map(result => `
+                <div class="search-result-card">
+                    <img src="${result.image}" alt="${result.title}" class="result-image">
+                    <div class="result-content">
+                        <h3>${result.title}</h3>
+                        <p>${result.description}</p>
+                        <p class="price">From $${result.price}</p>
+                        <button class="btn" onclick="viewDetails('${result.id}')">View Details</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function viewDetails(id) {
+            // Implement view details logic
+        }
+    </script>
+</body>
+</html>

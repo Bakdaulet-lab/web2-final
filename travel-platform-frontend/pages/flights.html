@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flights - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/flights.html" class="nav-link active">Flights</a>
+                <a href="/pages/profile.html" class="nav-link">Profile</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="search-section">
+            <h2>Search Flights</h2>
+            <form id="flightSearchForm" class="search-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="origin">From</label>
+                        <select id="origin" class="form-input" required>
+                            <option value="">Select City</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="destination">To</label>
+                        <select id="destination" class="form-input" required>
+                            <option value="">Select City</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="departureDate">Departure Date</label>
+                        <input type="date" id="departureDate" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="passengers">Passengers</label>
+                        <input type="number" id="passengers" class="form-input" min="1" value="1" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="priceRange">Price Range</label>
+                        <select id="priceRange" class="form-input">
+                            <option value="">Any Price</option>
+                            <option value="0-300">Under $300</option>
+                            <option value="300-500">$300 - $500</option>
+                            <option value="500+">$500+</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stops">Stops</label>
+                        <select id="stops" class="form-input">
+                            <option value="">Any</option>
+                            <option value="0">Non-stop</option>
+                            <option value="1">1 Stop</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Search Flights</button>
+            </form>
+        </section>
+
+        <section id="flightResults" class="results-section">
+            <!-- Flights will be loaded here -->
+        </section>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>Book Flight</h3>
+                <div id="selectedFlightInfo"></div>
+                <form id="bookingForm">
+                    <input type="hidden" id="flightId">
+                    <div class="form-group">
+                        <label>Passenger Information</label>
+                        <input type="text" id="passengerName" placeholder="Full Name" required>
+                        <input type="email" id="passengerEmail" placeholder="Email" required>
+                        <input type="tel" id="passengerPhone" placeholder="Phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Information</label>
+                        <input type="text" id="cardNumber" placeholder="Card Number" required>
+                        <input type="text" id="cardExpiry" placeholder="MM/YY" required>
+                        <input type="text" id="cardCvc" placeholder="CVC" required>
+                    </div>
+                    <div class="price-summary">
+                        <div>Ticket Price: <span id="ticketPrice"></span></div>
+                        <div>Taxes: <span id="taxAmount"></span></div>
+                        <div>Total: <span id="totalAmount"></span></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="../data/flightData.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        let selectedFlight = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+            setupEventListeners();
+            populateCityDropdowns();
+        });
+
+        function setupEventListeners() {
+            const form = document.getElementById('flightSearchForm');
+            form.addEventListener('submit', handleSearch);
+
+            // Set minimum date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('departureDate').min = today;
+
+            // Modal handlers
+            const modal = document.getElementById('bookingModal');
+            const closeBtn = document.querySelector('.close');
+            closeBtn.onclick = () => modal.style.display = 'none';
+            window.onclick = (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            };
+
+            document.getElementById('bookingForm').addEventListener('submit', handleBooking);
+        }
+
+        function populateCityDropdowns() {
+            const originSelect = document.getElementById('origin');
+            const destSelect = document.getElementById('destination');
+
+            cities.forEach(city => {
+                originSelect.add(new Option(city, city));
+                destSelect.add(new Option(city, city));
+            });
+        }
+
+        function handleSearch(e) {
+            e.preventDefault();
+            const origin = document.getElementById('origin').value;
+            const destination = document.getElementById('destination').value;
+            const priceRange = document.getElementById('priceRange').value;
+            const stops = document.getElementById('stops').value;
+
+            let filtered = flightData.filter(flight => 
+                flight.origin === origin && 
+                flight.destination === destination
+            );
+
+            if (priceRange) {
+                const [min, max] = priceRange.split('-').map(p => p === '+' ? Infinity : Number(p));
+                filtered = filtered.filter(f => f.price >= min && f.price <= (max || Infinity));
+            }
+
+            if (stops !== '') {
+                filtered = filtered.filter(f => f.stops === Number(stops));
+            }
+
+            displayFlights(filtered);
+        }
+
+        function displayFlights(flights) {
+            const resultsSection = document.getElementById('flightResults');
+            
+            if (!flights.length) {
+                resultsSection.innerHTML = '<div class="no-results">No flights found matching your criteria.</div>';
+                return;
+            }
+
+            const html = `
+                <h3>Available Flights</h3>
+                <div class="flights-grid">
+                    ${flights.map(flight => `
+                        <div class="flight-card">
+                            <div class="flight-header">
+                                <h4>${flight.airline}</h4>
+                                <p class="flight-number">Flight ${flight.flightNumber}</p>
+                            </div>
+                            <div class="flight-details">
+                                <div class="flight-time">
+                                    <p class="time">${formatTime(flight.departureTime)}</p>
+                                    <p class="location">${flight.origin}</p>
+                                </div>
+                                <div class="flight-duration">
+                                    <p>${calculateDuration(flight.departureTime, flight.arrivalTime)}</p>
+                                    <div class="flight-line"></div>
+                                    ${flight.stops ? `<span class="stops">${flight.stops} stop</span>` : ''}
+                                </div>
+                                <div class="flight-time">
+                                    <p class="time">${formatTime(flight.arrivalTime)}</p>
+                                    <p class="location">${flight.destination}</p>
+                                </div>
+                            </div>
+                            <div class="flight-footer">
+                                <div class="price-info">
+                                    <p class="price">$${flight.price}</p>
+                                    <p class="seats">${flight.seats} seats left</p>
+                                </div>
+                                <button class="btn btn-primary" onclick='showBookingModal(${JSON.stringify(flight)})'>
+                                    Book Now
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            resultsSection.innerHTML = html;
+        }
+
+        function formatTime(dateString) {
+            return new Date(dateString).toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function calculateDuration(departure, arrival) {
+            const diff = new Date(arrival) - new Date(departure);
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            return `${hours}h ${minutes}m`;
+        }
+
+        function showBookingModal(flight) {
+            selectedFlight = flight;
+            const modal = document.getElementById('bookingModal');
+            
+            document.getElementById('flightId').value = flight.id;
+            document.getElementById('ticketPrice').textContent = `$${flight.price}`;
+            document.getElementById('taxAmount').textContent = `$${Math.round(flight.price * 0.1)}`; // 10% tax
+            document.getElementById('totalAmount').textContent = `$${Math.round(flight.price * 1.1)}`;
+
+            document.getElementById('selectedFlightInfo').innerHTML = `
+                <div class="flight-summary">
+                    <h4>${flight.airline} - Flight ${flight.flightNumber}</h4>
+                    <p>${flight.origin} → ${flight.destination}</p>
+                    <p>Departure: ${new Date(flight.departureTime).toLocaleString()}</p>
+                    <p>Class: ${flight.class}</p>
+                </div>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        async function handleBooking(e) {
+            e.preventDefault();
+            if (!selectedFlight) return;
+
+            const bookingButton = e.target.querySelector('button[type="submit"]');
+            bookingButton.disabled = true;
+
+            try {
+                // Get form data
+                const bookingData = {
+                    flightDetails: {
+                        flightId: selectedFlight.id,
+                        airline: selectedFlight.airline,
+                        flightNumber: selectedFlight.flightNumber,
+                        origin: selectedFlight.origin,
+                        destination: selectedFlight.destination,
+                        departureTime: selectedFlight.departureTime,
+                        arrivalTime: selectedFlight.arrivalTime,
+                        class: selectedFlight.class,
+                        price: selectedFlight.price
+                    },
+                    passengerDetails: {
+                        name: document.getElementById('passengerName').value,
+                        email: document.getElementById('passengerEmail').value,
+                        phone: document.getElementById('passengerPhone').value
+                    },
+                    paymentDetails: {
+                        amount: selectedFlight.price,
+                        tax: Math.round(selectedFlight.price * 0.1),
+                        total: Math.round(selectedFlight.price * 1.1),
+                        cardNumber: document.getElementById('cardNumber').value,
+                        cardExpiry: document.getElementById('cardExpiry').value,
+                        cardCvc: document.getElementById('cardCvc').value
+                    }
+                };
+
+                // Use FlightService to handle booking
+                const response = await FlightService.bookFlight(bookingData);
+
+                if (response.success) {
+                    ToastService.success('Flight booked successfully! Check your email for confirmation.');
+                    document.getElementById('bookingModal').style.display = 'none';
+                    document.getElementById('bookingForm').reset();
+                    
+                    // Optionally refresh available seats
+                    await loadFlights();
+                } else {
+                    throw new Error(response.error || 'Booking failed');
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                ToastService.error(error.message || 'Unable to complete booking. Please try again.');
+            } finally {
+                bookingButton.disabled = false;
+            }
+        }
+    </script>
+    <script src="../services/FlightService.js"></script>
+    <script src="../services/ToastService.js"></script>
+</body>
+</html>

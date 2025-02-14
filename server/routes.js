@@ -1,148 +1,115 @@
 const express = require("express");
-const {
-  getHomePage,
-  getSignPage,
-  getLoginPage,
-  getProfilePage,
-  registerUser,
-  loginUser,
-  getProfile,
-  getUsers,
-  updateUser, 
-  deleteUser,
-  processBooking, 
-  sendConfirmationEmail,
-  generateItinerary, 
-  
-  processPayment 
-} = require("./userController.js");
-
-
-
-const {
-  createItinerary,
-  getUserItineraries,
-  updateItinerary,
-  deleteItinerary,
-} = require("./controllers/itineraryController.js");
-
-const {
-  createBooking,
-  getUserBookings,
-  updateBooking,
-  deleteBooking,
-} = require("./controllers/bookingController.js");
-
-const {
-  createAttraction,
-  getAttractions,
-  addReview,
-} = require("./controllers/attractionController.js");
-
-const {
-  createExcursion,
-  getExcursions,
-  updateExcursion,
-  deleteExcursion,
-} = require("./controllers/excursionController.js");
-
-const {
-  createFlight,
-  getFlights,
-  updateFlight,
-  deleteFlight,
-} = require("./controllers/flightController.js");
-
-const {
-  createAccommodation,
-  getAccommodations,
-  updateAccommodation,
-  deleteAccommodation,
-} = require("./controllers/accommodationController.js");
-
-
-const { validateRegister, validateLogin } = require("./middlewares/validation");
-
-
-const authenticate = require("./middlewares/auth");
-const paymentRoutes = require('./routes/paymentRoutes');
-
-
 const router = express.Router();
+const userController = require("./userController.js");
+const authenticate = require("./middlewares/auth").authenticate;
+const { validateRegister, validateLogin } = require("./middlewares/validation");
+const paymentRoutes = require('./routes/paymentRoutes');
+const path = require('path');
+const amadeusService = require('./services/amadeusService');
 
+// Import controllers
+const itineraryController = require("./controllers/itineraryController.js");
+const bookingController = require("./controllers/bookingController.js");
+const attractionController = require("./controllers/attractionController.js");
+const excursionController = require("./controllers/excursionController.js");
+const flightController = require("./controllers/flightController.js");
+const accommodationController = require("./controllers/accommodationController.js");
+const authController = require('./controllers/authController');
 
+// Basic routes
+router.get("/", userController.getHomePage);
+router.get("/sign", userController.getSignPage);
+router.get("/login", userController.getLoginPage);
+router.get("/profile", authenticate, userController.getProfilePage);
 
+// Auth routes
+router.post("/register", validateRegister, userController.registerUser);
+router.post("/login", validateLogin, userController.loginUser);
+router.post('/auth/login', authController.login);
+router.post('/auth/verify-otp', authController.verifyOTP);
 
+// User routes
+router.get("/profile", authenticate, userController.getProfile);
+router.get("/users", authenticate, userController.getUsers);
+router.put("/users/:id", authenticate, userController.updateUser);
+router.delete("/users/:id", authenticate, userController.deleteUser);
 
-
-router.get("/", getHomePage);
-router.get("/sign", getSignPage);
-router.get("/login", getLoginPage);
-
-
-router.post("/register", validateRegister, registerUser);
-router.post("/login", validateLogin, loginUser);
-
-// Protected routes (require JWT authentication)
-router.get("/profile", authenticate, getProfile);
-router.get("/users", authenticate, getUsers);
-router.put("/users/:id", authenticate, updateUser);
-router.delete("/users/:id", authenticate, deleteUser);
-
-
-
-// Booking endpoint
-router.post("/book", processBooking);
-
-// Send confirmation email
-router.post("/send-email", sendConfirmationEmail);
-
-
-// Generate itinerary
-router.post("/itinerary/generate", generateItinerary);
-
-// Update itinerary
-router.put("/itinerary/update", updateItinerary);
-
+// Payment routes
 router.use('/payments', paymentRoutes);
 
-
 // Itinerary routes
-router.post("/itineraries", createItinerary);
-router.get("/itineraries/:userId", getUserItineraries);
-router.put("/itineraries/:itineraryId", updateItinerary);
-router.delete("/itineraries/:itineraryId", deleteItinerary);
+router.post("/itineraries", authenticate, itineraryController.createItinerary);
+router.get("/itineraries", authenticate, itineraryController.getUserItineraries);
+router.put("/itineraries/:itineraryId", authenticate, itineraryController.updateItinerary);
+router.delete("/itineraries/:itineraryId", authenticate, itineraryController.deleteItinerary);
 
 // Booking routes
-router.post("/bookings", createBooking);
-router.get("/bookings/:userId", getUserBookings);
-router.put("/bookings/:bookingId", updateBooking);
-router.delete("/bookings/:bookingId", deleteBooking);
+router.post("/bookings", authenticate, bookingController.createBooking);
+router.get("/bookings", authenticate, bookingController.getUserBookings);
+router.put("/bookings/:bookingId", authenticate, bookingController.updateBooking);
+router.delete("/bookings/:bookingId", authenticate, bookingController.deleteBooking);
 
 // Attraction routes
-router.post("/attractions", createAttraction);
-router.get("/attractions", getAttractions);
-router.post("/attractions/:attractionId/reviews", addReview);
-
+router.post("/attractions", authenticate, attractionController.createAttraction);
+router.get("/attractions", attractionController.getAttractions);
+router.post("/attractions/:attractionId/reviews", authenticate, attractionController.addReview);
 
 // Excursion routes
-router.post("/excursions", createExcursion);
-router.get("/excursions", getExcursions);
-router.put("/excursions/:excursionId", updateExcursion);
-router.delete("/excursions/:excursionId", deleteExcursion);
+router.post("/excursions", authenticate, excursionController.createExcursion);
+router.get("/excursions", excursionController.getExcursions);
+router.put("/excursions/:excursionId", authenticate, excursionController.updateExcursion);
+router.delete("/excursions/:excursionId", authenticate, excursionController.deleteExcursion);
 
 // Flight routes
-router.post("/flights", createFlight);
-router.get("/flights", getFlights);
-router.put("/flights/:flightId", updateFlight);
-router.delete("/flights/:flightId", deleteFlight);
+router.post("/flights", authenticate, flightController.createFlight);
+router.get("/flights", authenticate, flightController.getFlights); // Add authenticate middleware
+router.put("/flights/:flightId", authenticate, flightController.updateFlight);
+router.delete("/flights/:flightId", authenticate, flightController.deleteFlight);
+router.post('/flights/book', authenticate, flightController.bookFlight);
+router.get('/flights/bookings', authenticate, flightController.getUserBookings);
 
 // Accommodation routes
-router.post("/accommodations", createAccommodation);
-router.get("/accommodations", getAccommodations);
-router.put("/accommodations/:accommodationId", updateAccommodation);
-router.delete("/accommodations/:accommodationId", deleteAccommodation);
+router.post("/accommodations", authenticate, accommodationController.createAccommodation);
+router.get("/accommodations", accommodationController.getAccommodations);
+router.put("/accommodations/:accommodationId", authenticate, accommodationController.updateAccommodation);
+router.delete("/accommodations/:accommodationId", authenticate, accommodationController.deleteAccommodation);
 
+// Booking processing routes
+router.post("/book", authenticate, userController.processBooking);
+router.post("/send-email", authenticate, userController.sendConfirmationEmail);
+router.post("/itinerary/generate", authenticate, userController.generateItinerary);
+router.put("/itinerary/update", authenticate, userController.updateItinerary);
+
+// Hotel search and booking routes
+router.get("/hotels/search", authenticate, accommodationController.searchHotels);
+router.post('/hotels/book', authenticate, accommodationController.bookHotel);
+
+// Test routes
+router.post("/test-email", async (req, res) => {
+    try {
+        await sendOTPEmail(process.env.EMAIL_USER, "123456");
+        res.status(200).json({ message: "Test email sent successfully" });
+    } catch (error) {
+        console.error("Test email failed:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+router.get('/test-amadeus', async (req, res) => {
+    try {
+        const token = await amadeusService.getToken();
+        res.json({ 
+            success: true, 
+            token 
+        });
+    } catch (error) {
+        console.error('Amadeus test error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message || 'Failed to get Amadeus token' 
+        });
+    }
+});
 
 module.exports = router;
 

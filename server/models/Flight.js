@@ -1,4 +1,3 @@
-// models/Flight.js
 const mongoose = require("mongoose");
 
 const flightSchema = new mongoose.Schema({
@@ -9,6 +8,7 @@ const flightSchema = new mongoose.Schema({
   flightNumber: {
     type: String,
     required: true,
+    unique: true,
   },
   origin: {
     type: String,
@@ -30,8 +30,18 @@ const flightSchema = new mongoose.Schema({
     type: Number,
     required: true,
   },
+  seats: {
+    type: Number,
+    default: 180,
+  },
+  class: {
+    type: String,
+    enum: ["Economy", "Business", "First"],
+    default: "Economy",
+  },
 });
 
 const Flight = mongoose.model("Flight", flightSchema);
 
 module.exports = Flight;
+

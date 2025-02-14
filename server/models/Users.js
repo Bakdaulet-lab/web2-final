@@ -1,7 +1,6 @@
 // models/User.js
 const mongoose = require("mongoose");
 
-
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -19,13 +18,18 @@ const userSchema = new mongoose.Schema({
   },
   age: {
     type: Number,
-    required: false,  
-    min: 0,           
-    max: 100,         
+    required: false,
   },
-  
+  otp: {
+    type: String,
+  },
+  otpExpires: {
+    type: Date,
+  },
+  refreshToken: {
+    type: String,
+  }
 });
-
 
 const User = mongoose.model("User", userSchema);
 

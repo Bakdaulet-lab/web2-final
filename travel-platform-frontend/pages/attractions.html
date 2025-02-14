@@ -1,0 +1,113 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attractions - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/attractions.html" class="nav-link active">Attractions</a>
+                <a href="/pages/profile.html" class="nav-link">Profile</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="attractions">
+            <h2>Popular Attractions</h2>
+            <div class="filters">
+                <input type="text" id="searchInput" placeholder="Search attractions..." class="form-input">
+                <select id="locationFilter" class="form-input">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <div id="attractionsGrid" class="attractions-grid">
+                <!-- Attractions will be loaded here -->
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+
+            try {
+                const attractions = await ApiService.getAttractions();
+                renderAttractions(attractions);
+                setupFilters(attractions);
+            } catch (error) {
+                console.error('Error loading attractions:', error);
+                alert('Failed to load attractions.');
+            }
+        });
+
+        function renderAttractions(attractions) {
+            const html = attractions.map(attraction => `
+                <div class="attraction-card">
+                    <img src="${attraction.images[0]}" alt="${attraction.name}" class="card-image">
+                    <div class="card-content">
+                        <h3>${attraction.name}</h3>
+                        <p>${attraction.description}</p>
+                        <p class="location">${attraction.location}</p>
+                        <button class="btn" onclick="showDetails('${attraction._id}')">View Details</button>
+                    </div>
+                </div>
+            `).join('');
+            document.getElementById('attractionsGrid').innerHTML = html;
+        }
+
+        function setupFilters(attractions) {
+            const locations = [...new Set(attractions.map(a => a.location))];
+            const locationFilter = document.getElementById('locationFilter');
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                locationFilter.appendChild(option);
+            });
+
+            // Add filter event listeners
+            document.getElementById('searchInput').addEventListener('input', filterAttractions);
+            locationFilter.addEventListener('change', filterAttractions);
+        }
+
+        function filterAttractions() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const location = document.getElementById('locationFilter').value;
+            
+            const filteredAttractions = attractions.filter(attraction => {
+                const matchesSearch = attraction.name.toLowerCase().includes(searchTerm) ||
+                                    attraction.description.toLowerCase().includes(searchTerm);
+                const matchesLocation = !location || attraction.location === location;
+                return matchesSearch && matchesLocation;
+            });
+
+            renderAttractions(filteredAttractions);
+        }
+
+        async function showDetails(attractionId) {
+            try {
+                const attraction = await ApiService.getAttractionDetails(attractionId);
+                // Implement modal or navigation to details page
+            } catch (error) {
+                console.error('Error loading attraction details:', error);
+                alert('Failed to load attraction details.');
+            }
+        }
+    </script>
+</body>
+</html>

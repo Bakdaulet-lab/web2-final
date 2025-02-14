@@ -8,55 +8,130 @@ const { generateAccessToken, generateRefreshToken } = require("../utils/generate
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || "RefreshSecret";
 
 exports.login = async (req, res) => {
-  const { username, password } = req.body;
+    try {
+        const { username, password } = req.body;
 
-  if (!username || !password) {
-    return res.status(400).json({ error: "Please provide both username and password." });
-  }
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username and password are required'
+            });
+        }
 
-  try {
-    const user = await User.findOne({ username });
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ error: "Invalid username or password." });
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid credentials'
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                error: 'Invalid credentials'
+            });
+        }
+
+        // Generate OTP
+        const otp = generateOTP();
+        user.otp = otp;
+        user.otpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
+        await user.save();
+
+        // Send OTP email
+        await sendOTPEmail(user.email, otp);
+
+        res.status(200).json({
+            success: true,
+            message: 'OTP sent to your email',
+            requiresOTP: true,
+            userId: user._id
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Server error during login'
+        });
     }
-
-    const otp = generateOTP();
-    user.otp = otp;
-    user.otpExpires = Date.now() + 5 * 60 * 1000; // 5 minutes expiry
-    await user.save();
-
-    await sendOTPEmail(user.email, otp);
-
-    res.status(200).json({ message: "OTP sent to email." });
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
 };
 
 exports.verifyOTP = async (req, res) => {
-  const { username, otp } = req.body;
+  const { userId, otp } = req.body;
 
   try {
-    const user = await User.findOne({ username });
-    if (!user || user.otp !== otp || user.otpExpires < Date.now()) {
-      return res.status(401).json({ error: "Invalid or expired OTP." });
+    console.log('Verifying OTP:', { userId, otp }); // Debug log
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(401).json({ 
+        success: false,
+        error: "User not found" 
+      });
     }
 
+    console.log('Stored OTP:', user.otp); // Debug log
+    console.log('Received OTP:', otp); // Debug log
+    console.log('OTP Expiry:', user.otpExpires); // Debug log
+
+    // Make sure we're comparing strings
+    const storedOTP = user.otp ? user.otp.toString() : null;
+    const submittedOTP = otp ? otp.toString() : null;
+
+    if (!storedOTP || !user.otpExpires) {
+      return res.status(401).json({ 
+        success: false,
+        error: "No OTP request found" 
+      });
+    }
+
+    if (Date.now() > user.otpExpires) {
+      return res.status(401).json({ 
+        success: false,
+        error: "OTP has expired" 
+      });
+    }
+
+    if (storedOTP !== submittedOTP) {
+      console.log('OTP mismatch:', { stored: storedOTP, submitted: submittedOTP }); // Debug log
+      return res.status(401).json({ 
+        success: false,
+        error: "Invalid OTP" 
+      });
+    }
+
+    // Clear OTP after successful verification
     user.otp = null;
     user.otpExpires = null;
-    await user.save();
 
+    // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
+
+    // Save refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
-    res.cookie("refreshToken", refreshToken, { httpOnly: true, secure: true });
-    res.json({ accessToken });
+    res.status(200).json({
+      success: true,
+      message: "Authentication successful",
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email
+      }
+    });
   } catch (error) {
     console.error("OTP verification error:", error);
-    res.status(500).json({ error: "Server error. Please try again later." });
+    res.status(500).json({ 
+      success: false,
+      error: "Server error" 
+    });
   }
 };
 

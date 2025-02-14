@@ -1,0 +1,209 @@
+/settings.html 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/settings.html" class="nav-link active">Settings</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="settings-container">
+            <h2>Account Settings</h2>
+            
+            <section class="settings-section">
+                <h3>Profile Settings</h3>
+                <form id="profileSettingsForm" class="settings-form">
+                    <div class="form-group">
+                        <label for="displayName">Display Name</label>
+                        <input type="text" id="displayName" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" class="form-input">
+                    </div>
+                    <button type="submit" class="btn">Save Changes</button>
+                </form>
+            </section>
+
+            <section class="settings-section">
+                <h3>Password</h3>
+                <form id="passwordForm" class="settings-form">
+                    <div class="form-group">
+                        <label for="currentPassword">Current Password</label>
+                        <input type="password" id="currentPassword" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">New Password</label>
+                        <input type="password" id="newPassword" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm New Password</label>
+                        <input type="password" id="confirmPassword" class="form-input">
+                    </div>
+                    <button type="submit" class="btn">Change Password</button>
+                </form>
+            </section>
+
+            <section class="settings-section">
+                <h3>Notifications</h3>
+                <form id="notificationSettingsForm" class="settings-form">
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="emailNotifications">
+                            Email Notifications
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="pushNotifications">
+                            Push Notifications
+                        </label>
+                    </div>
+                    <button type="submit" class="btn">Save Preferences</button>
+                </form>
+            </section>
+
+            <section class="settings-section danger-zone">
+                <h3>Danger Zone</h3>
+                <button id="deactivateAccountBtn" class="btn btn-danger">Deactivate Account</button>
+                <button id="deleteAccountBtn" class="btn btn-danger">Delete Account</button>
+            </section>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/notification.js"></script>
+    <script src="../js/utils.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+
+            try {
+                const userProfile = await ApiService.getUserProfile();
+                populateProfileForm(userProfile);
+                setupEventListeners();
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                NotificationService.error('Failed to load profile settings');
+            }
+        });
+
+        function populateProfileForm(profile) {
+            document.getElementById('displayName').value = profile.displayName || '';
+            document.getElementById('email').value = profile.email || '';
+            document.getElementById('emailNotifications').checked = profile.emailNotifications || false;
+            document.getElementById('pushNotifications').checked = profile.pushNotifications || false;
+        }
+
+        function setupEventListeners() {
+            document.getElementById('profileSettingsForm').addEventListener('submit', handleProfileUpdate);
+            document.getElementById('passwordForm').addEventListener('submit', handlePasswordChange);
+            document.getElementById('notificationSettingsForm').addEventListener('submit', handleNotificationSettings);
+            document.getElementById('deactivateAccountBtn').addEventListener('click', handleDeactivateAccount);
+            document.getElementById('deleteAccountBtn').addEventListener('click', handleDeleteAccount);
+        }
+
+        async function handleProfileUpdate(e) {
+            e.preventDefault();
+            const formData = {
+                displayName: document.getElementById('displayName').value,
+                email: document.getElementById('email').value
+            };
+
+            try {
+                await ApiService.updateUserProfile(formData);
+                NotificationService.success('Profile updated successfully');
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                NotificationService.error('Failed to update profile');
+            }
+        }
+
+        async function handlePasswordChange(e) {
+            e.preventDefault();
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                NotificationService.error('New passwords do not match');
+                return;
+            }
+
+            try {
+                await ApiService.changePassword({
+                    currentPassword,
+                    newPassword
+                });
+                NotificationService.success('Password changed successfully');
+                e.target.reset();
+            } catch (error) {
+                console.error('Error changing password:', error);
+                NotificationService.error('Failed to change password');
+            }
+        }
+
+        async function handleNotificationSettings(e) {
+            e.preventDefault();
+            const settings = {
+                emailNotifications: document.getElementById('emailNotifications').checked,
+                pushNotifications: document.getElementById('pushNotifications').checked
+            };
+
+            try {
+                await ApiService.updateNotificationSettings(settings);
+                NotificationService.success('Notification preferences updated');
+            } catch (error) {
+                console.error('Error updating notification settings:', error);
+                NotificationService.error('Failed to update notification settings');
+            }
+        }
+
+        async function handleDeactivateAccount() {
+            if (!confirm('Are you sure you want to deactivate your account? This can be reversed later.')) {
+                return;
+            }
+
+            try {
+                await ApiService.deactivateAccount();
+                AuthService.logout();
+            } catch (error) {
+                console.error('Error deactivating account:', error);
+                NotificationService.error('Failed to deactivate account');
+            }
+        }
+
+        async function handleDeleteAccount() {
+            if (!confirm('Are you sure you want to delete your account? This cannot be undone!')) {
+                return;
+            }
+
+            try {
+                await ApiService.deleteAccount();
+                AuthService.logout();
+            } catch (error) {
+                console.error('Error deleting account:', error);
+                NotificationService.error('Failed to delete account');
+            }
+        }
+    </script>
+</body>
+</html>

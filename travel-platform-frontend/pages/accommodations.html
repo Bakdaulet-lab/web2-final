@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotels - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/hotels.html" class="nav-link active">Hotels</a>
+                <a href="/pages/profile.html" class="nav-link">Profile</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="search-section">
+            <h2>Find Hotels</h2>
+            <form id="hotelSearchForm" class="search-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="city">City</label>
+                        <input type="text" id="city" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="checkIn">Check-in</label>
+                        <input type="date" id="checkIn" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="checkOut">Check-out</label>
+                        <input type="date" id="checkOut" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="guests">Guests</label>
+                        <input type="number" id="guests" class="form-input" min="1" value="2" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="rooms">Rooms</label>
+                        <input type="number" id="rooms" class="form-input" min="1" value="1" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="amenities">Amenities</label>
+                        <select id="amenities" class="form-input" multiple>
+                            <option value="WIFI">WiFi</option>
+                            <option value="SWIMMING_POOL">Pool</option>
+                            <option value="FITNESS_CENTER">Gym</option>
+                            <option value="RESTAURANT">Restaurant</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ratings">Star Rating</label>
+                        <select id="ratings" class="form-input">
+                            <option value="">Any</option>
+                            <option value="3">3+ Stars</option>
+                            <option value="4">4+ Stars</option>
+                            <option value="5">5 Stars</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Search Hotels</button>
+            </form>
+        </section>
+
+        <section id="hotelResults" class="results-section">
+            <!-- Hotels will be loaded here -->
+        </section>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3>Book Hotel</h3>
+                <div id="selectedHotelInfo"></div>
+                <form id="bookingForm">
+                    <input type="hidden" id="hotelId">
+                    <input type="hidden" id="offerId">
+                    <div class="form-group">
+                        <label>Guest Information</label>
+                        <input type="text" id="guestName" placeholder="Full Name" required>
+                        <input type="email" id="guestEmail" placeholder="Email" required>
+                        <input type="tel" id="guestPhone" placeholder="Phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Information</label>
+                        <input type="text" id="cardNumber" placeholder="Card Number" required>
+                        <input type="text" id="cardExpiry" placeholder="MM/YY" required>
+                        <input type="text" id="cardCvc" placeholder="CVC" required>
+                    </div>
+                    <div class="price-summary">
+                        <div>Room Rate: <span id="roomRate"></span></div>
+                        <div>Taxes: <span id="taxAmount"></span></div>
+                        <div>Total: <span id="totalAmount"></span></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../services/HotelService.js"></script>
+    <script>
+        let currentHotels = [];
+        let selectedHotel = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            const form = document.getElementById('hotelSearchForm');
+            form.addEventListener('submit', handleSearch);
+
+            // Set minimum dates
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('checkIn').min = today;
+            document.getElementById('checkOut').min = today;
+
+            // Modal handlers
+            const modal = document.getElementById('bookingModal');
+            const closeBtn = document.querySelector('.close');
+            closeBtn.onclick = () => modal.style.display = 'none';
+            window.onclick = (e) => {
+                if (e.target === modal) modal.style.display = 'none';
+            };
+
+            // Booking form handler
+            document.getElementById('bookingForm').addEventListener('submit', handleBooking);
+        }
+
+        async function handleSearch(e) {
+            e.preventDefault();
+            const resultsSection = document.getElementById('hotelResults');
+            const searchButton = e.target.querySelector('button[type="submit"]');
+            
+            try {
+                searchButton.disabled = true;
+                resultsSection.innerHTML = `
+                    <div class="loading-overlay">
+                        <div class="spinner"></div>
+                        <p>Searching for hotels...</p>
+                    </div>
+                `;
+
+                const checkIn = new Date(document.getElementById('checkIn').value);
+                const checkOut = new Date(document.getElementById('checkOut').value);
+                
+                if (checkIn >= checkOut) {
+                    ToastService.error('Check-out date must be after check-in date');
+                    return;
+                }
+
+                const searchParams = {
+                    city: document.getElementById('city').value,
+                    checkIn: document.getElementById('checkIn').value,
+                    checkOut: document.getElementById('checkOut').value,
+                    adults: document.getElementById('guests').value,
+                    rooms: document.getElementById('rooms').value,
+                    amenities: Array.from(document.getElementById('amenities').selectedOptions).map(o => o.value),
+                    ratings: document.getElementById('ratings').value,
+                    currency: 'USD'
+                };
+
+                const response = await HotelService.searchHotels(searchParams);
+
+                if (response.success) {
+                    currentHotels = response.hotels;
+                    displayHotels(response.hotels);
+                } else {
+                    ToastService.error(response.error || 'No hotels found for your criteria');
+                    resultsSection.innerHTML = `
+                        <div class="no-results">
+                            <p>No hotels found matching your criteria.</p>
+                            <p>Try adjusting your search filters.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                ToastService.error(error.message || 'Failed to search hotels');
+                resultsSection.innerHTML = `
+                    <div class="error-state">
+                        <p>Unable to complete your search at this time.</p>
+                        <button class="btn btn-secondary" onclick="retrySearch()">Try Again</button>
+                    </div>
+                `;
+            } finally {
+                searchButton.disabled = false;
+            }
+        }
+
+        async function handleBooking(e) {
+            e.preventDefault();
+            if (!selectedHotel) return;
+
+            const bookingButton = e.target.querySelector('button[type="submit"]');
+            bookingButton.disabled = true;
+
+            try {
+                const bookingData = {
+                    hotelId: document.getElementById('hotelId').value,
+                    offerId: document.getElementById('offerId').value,
+                    guests: [{
+                        name: document.getElementById('guestName').value,
+                        email: document.getElementById('guestEmail').value,
+                        phone: document.getElementById('guestPhone').value
+                    }],
+                    payment: {
+                        cardNumber: document.getElementById('cardNumber').value,
+                        expiryDate: document.getElementById('cardExpiry').value,
+                        cvc: document.getElementById('cardCvc').value
+                    }
+                };
+
+                const response = await HotelService.bookHotel(bookingData);
+                if (response.success) {
+                    ToastService.success('Booking confirmed successfully!');
+                    document.getElementById('bookingModal').style.display = 'none';
+                    // Optionally redirect to booking confirmation page
+                    // window.location.href = `/pages/booking-confirmation.html?id=${response.bookingId}`;
+                } else {
+                    ToastService.error(response.error || 'Booking failed');
+                }
+            } catch (error) {
+                console.error('Booking error:', error);
+                ToastService.error('Unable to complete booking. Please try again.');
+            } finally {
+                bookingButton.disabled = false;
+            }
+        }
+
+        function retrySearch() {
+            document.getElementById('hotelSearchForm').dispatchEvent(new Event('submit'));
+        }
+
+        function showBookingModal(hotel, offer) {
+            selectedHotel = hotel;
+            const modal = document.getElementById('bookingModal');
+            
+            document.getElementById('hotelId').value = hotel.id;
+            document.getElementById('offerId').value = offer.id;
+            document.getElementById('roomRate').textContent = HotelService.formatPrice(offer.price.base);
+            document.getElementById('taxAmount').textContent = HotelService.formatPrice(offer.price.taxes[0]?.amount || 0);
+            document.getElementById('totalAmount').textContent = HotelService.formatPrice(offer.price.total);
+
+            document.getElementById('selectedHotelInfo').innerHTML = `
+                <div class="hotel-summary">
+                    <h4>${hotel.name}</h4>
+                    <p>${offer.room.description}</p>
+                </div>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        function displayHotels(hotels) {
+            const resultsSection = document.getElementById('hotelResults');
+            
+            if (!hotels.length) {
+                resultsSection.innerHTML = '<div class="no-results">No hotels found.</div>';
+                return;
+            }
+
+            const html = hotels.map(hotel => {
+                const bestPrice = HotelService.getBestPrice(hotel);
+                return `
+                    <div class="hotel-card">
+                        <div class="hotel-header">
+                            <h3>${hotel.name}</h3>
+                            <p class="location">${hotel.location.cityCode}</p>
+                        </div>
+                        <div class="hotel-content">
+                            ${bestPrice ? `
+                                <div class="price-info">
+                                    <div class="best-price">
+                                        <span class="price-label">Best Price</span>
+                                        <span class="price-amount">${HotelService.formatPrice(bestPrice.price.total)}</span>
+                                        ${bestPrice.price.taxes[0] ? 
+                                            `<span class="tax-amount">+${HotelService.formatPrice(bestPrice.price.taxes[0].amount)} tax</span>` 
+                                            : ''
+                                        }
+                                    </div>
+                                    <button class="btn btn-primary" onclick='showBookingModal(${JSON.stringify(hotel)}, ${JSON.stringify(bestPrice)})'>
+                                        Book Now
+                                    </button>
+                                </div>
+                            ` : '<p>No prices available</p>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsSection.innerHTML = `
+                <h3>Found ${hotels.length} hotels in ${document.getElementById('city').value}</h3>
+                <div class="hotels-grid">${html}</div>
+            `;
+        }
+    </script>
+</body>
+</html>

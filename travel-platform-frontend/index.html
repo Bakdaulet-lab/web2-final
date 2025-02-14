@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Travel Platform</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link active">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link auth-required">Dashboard</a>
+                <a href="/pages/profile.html" class="nav-link auth-required">Profile</a>
+                <div class="auth-links">
+                    <a href="/pages/login.html" class="nav-link" id="loginLink">Login</a>
+                    <a href="/pages/register.html" class="nav-link" id="registerLink">Register</a>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <section class="hero">
+            <h1>Discover Amazing Places</h1>
+            <p>Plan your next adventure with us</p>
+        </section>
+
+        <section class="features" id="featuresSection">
+            <!-- Dynamic content will be loaded here -->
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2025 Travel Platform. All rights reserved.</p>
+    </footer>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

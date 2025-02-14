@@ -8,7 +8,7 @@ const nodemailer = require("nodemailer");
 const axios = require("axios");
 
 
-const JWT_SECRET = "Bakdaulet";
+const JWT_SECRET = "fd3e1a6c2b5a9d8e7f6b4c3a1d2e9f8d7c6b5a4e3d2c1b0f9e8d7c6b5a4e3d2c";
 
 if (!JWT_SECRET) {
   console.error("JWT_SECRET is not defined in the environment variables.");
@@ -17,71 +17,79 @@ if (!JWT_SECRET) {
 
 
 exports.getHomePage = (req, res) => {
-  res.sendFile(path.join(__dirname, "../public", "index.html"));
+  res.sendFile(path.join(__dirname, "../travel-platform-frontend", "index.html"));
 };
 
 exports.getSignPage = (req, res) => {
-  res.sendFile(path.join(__dirname, "../public", "Signin.html"));
+  res.sendFile(path.join(__dirname, "../travel-platform-frontend/pages", "register.html"));
 };
 
 exports.getLoginPage = (req, res) => {
-  res.sendFile(path.join(__dirname, "../public", "Login.html"));
+  res.sendFile(path.join(__dirname, "../travel-platform-frontend/pages", "Login.html"));
 };
 
 exports.getProfilePage = (req, res) => {
-  res.sendFile(path.join(__dirname, "../public", "Profile.html"));
+  res.sendFile(path.join(__dirname, "../travel-platform-frontend/pages", "profile.html"));
 };
 
 
 
 exports.registerUser = async (req, res) => {
-  const { username, password, email, age } = req.body;
+    try {
+        const { username, password, email, age } = req.body;
 
-  if (!username || !password || !email || !age) {
-    return res.status(400).json({ error: "Please enter all required fields." });
-  }
+        if (!username || !password || !email) {
+            return res.status(400).json({ error: "Please provide all required fields." });
+        }
 
-  try {
-    // Check if the email already exists
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(409).json({ error: "Email is already registered." });
+        // Check if user already exists
+        const existingUser = await User.findOne({ 
+            $or: [{ email }, { username }] 
+        });
+        
+        if (existingUser) {
+            return res.status(409).json({ 
+                error: "User already exists with this email or username." 
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create new user
+        const user = new User({
+            username,
+            password: hashedPassword,
+            email,
+            age: age || null
+        });
+
+        await user.save();
+
+        // Generate token
+        const token = jwt.sign(
+            { userId: user._id, username: user.username }, 
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // Send response
+        res.status(201).json({
+            message: "User registered successfully",
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email
+            }
+        });
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ 
+            error: "An error occurred during registration." 
+        });
     }
-
-    // Check if the username already exists
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(409).json({ error: "Username is already taken." });
-    }
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = new User({ username, password: hashedPassword, email, age });
-    await newUser.save();
-
-
-    // Generate JWT token
-    const token = jwt.sign({ userId: newUser._id, username: newUser.username }, JWT_SECRET, {
-      expiresIn: "1h", // Token expires in 1 hour
-    });
-
-    // Set the token in a cookie
-    res.cookie("token", token, { httpOnly: true, maxAge: 3600000 }); // 1 hour
-
-
-
-
-    return res.redirect("/Login.html");
-
-  } catch (err) {
-    if (err.code === 11000) {
-      // MongoDB duplicate key error
-      return res.status(409).json({ error: "Email or username already exists." });
-    }
-    console.error("Registration error:", err);
-    return res.status(500).json({ error: "Server error. Please try again later." });
-  }
 };
 
 
@@ -107,14 +115,19 @@ exports.loginUser = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET, {
-      expiresIn: "1h", // Token expires in 1 hour
+      expiresIn: "1h"
     });
 
-    // Set the token in a cookie
-    res.cookie("token", token, { httpOnly: true, maxAge: 3600000 }); // 1 hour
-
-    
-    return res.redirect("/");
+    // Send response with token and user data
+    res.status(200).json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email
+      },
+      message: "Login successful"
+    });
 
   } catch (err) {
     console.error("Login error:", err);

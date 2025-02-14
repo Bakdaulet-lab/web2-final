@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Travel Platform</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <header class="header">
+        <nav class="nav">
+            <div class="nav-brand">Travel Platform</div>
+            <div class="nav-menu">
+                <a href="/" class="nav-link">Home</a>
+                <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/pages/flights.html" class="nav-link">Flights</a>
+                <a href="/pages/accommodations.html" class="nav-link">Accommodations</a>
+                <a href="/pages/excursions.html" class="nav-link">Excursions</a>
+                <a href="/pages/itineraries.html" class="nav-link">Itineraries</a>
+                <a href="/pages/profile.html" class="nav-link">Profile</a>
+                <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="dashboard-container">
+            <div class="dashboard-header">
+                <h2>My Dashboard</h2>
+                <button class="btn" id="createItineraryBtn">Create New Itinerary</button>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="dashboard-section">
+                    <h3>My Itineraries</h3>
+                    <div id="itinerariesList" class="itineraries-grid">
+                        <!-- Itineraries will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="dashboard-section">
+                    <h3>Upcoming Trips</h3>
+                    <div id="upcomingTrips" class="trips-grid">
+                        <!-- Upcoming trips will be loaded here -->
+                    </div>
+                </div>
+
+                <div class="dashboard-section">
+                    <h3>Recent Bookings</h3>
+                    <div id="recentBookings" class="bookings-grid">
+                        <!-- Recent bookings will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="itineraryModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Create New Itinerary</h3>
+            <form id="itineraryForm" class="form-container">
+                <div class="form-group">
+                    <label for="destination" class="form-label">Destination</label>
+                    <input type="text" id="destination" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="startDate" class="form-label">Start Date</label>
+                    <input type="date" id="startDate" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="endDate" class="form-label">End Date</label>
+                    <input type="date" id="endDate" class="form-input" required>
+                </div>
+                <button type="submit" class="btn">Create Itinerary</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        if (!AuthService.isAuthenticated()) {
+            window.location.href = '/pages/login.html';
+            return;
+        }
+
+        loadDashboardData();
+        setupEventListeners();
+    });
+
+    function setupEventListeners() {
+        const modal = document.getElementById('itineraryModal');
+        const createBtn = document.getElementById('createItineraryBtn');
+        const closeBtn = document.querySelector('.close');
+        const form = document.getElementById('itineraryForm');
+
+        if (createBtn) {
+            createBtn.onclick = () => {
+                if (modal) modal.style.display = "block";
+            };
+        }
+
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                if (modal) modal.style.display = "none";
+            };
+        }
+
+        // Replace window.onclick with document.addEventListener
+        document.addEventListener('click', (e) => {
+            if (modal && e.target === modal) {
+                modal.style.display = "none";
+            }
+        });
+
+        if (form) {
+            form.addEventListener('submit', handleItinerarySubmit);
+        }
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', handleLogout);
+        }
+    }
+
+    async function loadDashboardData() {
+        try {
+            const [itinerariesResponse, bookingsResponse] = await Promise.all([
+                ApiService.request('/itineraries'),
+                ApiService.request('/bookings/user')
+            ]);
+
+            if (itinerariesResponse.success && itinerariesResponse.itineraries) {
+                renderItineraries(itinerariesResponse.itineraries);
+            }
+
+            if (bookingsResponse.success && bookingsResponse.bookings) {
+                renderBookings(bookingsResponse.bookings);
+            }
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+            NotificationService.error('Failed to load dashboard information');
+        }
+    }
+
+    function renderItineraries(itineraries) {
+        const itinerariesList = document.getElementById('itinerariesList');
+        if (!itinerariesList) return;
+
+        if (!itineraries.length) {
+            itinerariesList.innerHTML = '<p>No itineraries found</p>';
+            return;
+        }
+
+        const html = itineraries.map(itinerary => `
+            <div class="itinerary-card">
+                <h3>${itinerary.destination}</h3>
+                <p>From: ${new Date(itinerary.startDate).toLocaleDateString()}</p>
+                <p>To: ${new Date(itinerary.endDate).toLocaleDateString()}</p>
+                <div class="card-actions">
+                    <button class="btn btn-secondary" onclick="editItinerary('${itinerary._id}')">Edit</button>
+                    <button class="btn btn-danger" onclick="deleteItinerary('${itinerary._id}')">Delete</button>
+                </div>
+            </div>
+        `).join('');
+
+        itinerariesList.innerHTML = html;
+    }
+
+    function renderBookings(bookings) {
+        const bookingsList = document.getElementById('recentBookings');
+        if (!bookingsList) return;
+
+        if (!bookings.length) {
+            bookingsList.innerHTML = '<p>No recent bookings</p>';
+            return;
+        }
+
+        const html = bookings.map(booking => `
+            <div class="booking-card">
+                <h4>${booking.type.toUpperCase()} Booking</h4>
+                <p>Date: ${new Date(booking.bookingDate).toLocaleDateString()}</p>
+                <p>Status: ${booking.status}</p>
+                <p>Amount: ${Utils.formatCurrency(booking.paymentDetails.total)}</p>
+            </div>
+        `).join('');
+
+        bookingsList.innerHTML = html;
+    }
+
+    async function handleItinerarySubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        
+        try {
+            submitButton.disabled = true;
+            const itineraryData = {
+                destination: form.destination.value,
+                startDate: form.startDate.value,
+                endDate: form.endDate.value
+            };
+
+            const response = await ApiService.request('/itineraries', {
+                method: 'POST',
+                body: JSON.stringify(itineraryData)
+            });
+
+            if (response.success) {
+                NotificationService.success('Itinerary created successfully');
+                const modal = document.getElementById('itineraryModal');
+                if (modal) modal.style.display = "none";
+                form.reset();
+                await loadDashboardData();
+            } else {
+                throw new Error(response.error || 'Failed to create itinerary');
+            }
+        } catch (error) {
+            console.error('Error creating itinerary:', error);
+            NotificationService.error(error.message || 'Failed to create itinerary');
+        } finally {
+            submitButton.disabled = false;
+        }
+    }
+
+    function handleLogout(e) {
+        e.preventDefault();
+        AuthService.logout();
+        window.location.href = '/pages/login.html';
+    }
+</script>
+</body>
+</html>

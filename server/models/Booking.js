@@ -5,31 +5,29 @@ const bookingSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
+    required: true
   },
   excursionId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Excursion",
+    ref: "Excursion"
   },
   flightId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Flight",
+    ref: "Flight"
   },
   accommodationId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Accommodation",
+    ref: "Accommodation"
   },
   bookingDate: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
   status: {
     type: String,
-    enum: ["Pending", "Confirmed", "Cancelled"],
-    default: "Pending",
-  },
+    enum: ["pending", "confirmed", "cancelled"],
+    default: "pending"
+  }
 });
 
-const Booking = mongoose.model("Booking", bookingSchema);
-
-module.exports = Booking;
+module.exports = mongoose.model("Booking", bookingSchema);
