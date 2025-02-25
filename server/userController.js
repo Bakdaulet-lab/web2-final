@@ -39,27 +39,28 @@ exports.registerUser = async (req, res) => {
         const { username, password, email, age } = req.body;
 
         if (!username || !password || !email) {
-            return res.status(400).json({ error: "Please provide all required fields." });
+            return res.status(400).json({
+                success: false,
+                error: "Please provide all required fields."
+            });
         }
 
-        // Check if user already exists
+        // Check for existing user
         const existingUser = await User.findOne({ 
             $or: [{ email }, { username }] 
         });
         
         if (existingUser) {
-            return res.status(409).json({ 
-                error: "User already exists with this email or username." 
+            return res.status(409).json({
+                success: false, 
+                error: "User already exists with this email or username."
             });
         }
 
-        // Hash password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create new user
+        // Create new user - let the schema handle password hashing
         const user = new User({
             username,
-            password: hashedPassword,
+            password, // Will be hashed by pre-save middleware
             email,
             age: age || null
         });
@@ -69,12 +70,12 @@ exports.registerUser = async (req, res) => {
         // Generate token
         const token = jwt.sign(
             { userId: user._id, username: user.username }, 
-            process.env.JWT_SECRET,
+            JWT_SECRET,
             { expiresIn: '1h' }
         );
 
-        // Send response
         res.status(201).json({
+            success: true,
             message: "User registered successfully",
             token,
             user: {
@@ -86,8 +87,9 @@ exports.registerUser = async (req, res) => {
 
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ 
-            error: "An error occurred during registration." 
+        res.status(500).json({
+            success: false,
+            error: "An error occurred during registration."
         });
     }
 };
@@ -242,19 +244,30 @@ exports.fetchHotels = async (req, res) => {
 
 
 
-
 // Get user profile
 exports.getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId).select("-password"); // Exclude password
-    if (!user) {
-      return res.status(404).json({ error: "User not found." });
+    try {
+        const user = await User.findById(req.user.userId)
+            .select('-password -refreshTokens -otp -otpExpires');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        console.error('Profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch profile'
+        });
     }
-    res.status(200).json({ user });
-  } catch (err) {
-    console.error("Profile error:", err);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
 };
 
 exports.getUsers = (req, res) => {
@@ -263,25 +276,34 @@ exports.getUsers = (req, res) => {
 };
 
 exports.updateUser = async (req, res) => {
-  const { id } = req.params; // Get the user's ID from the URL
-  const { username, email, age } = req.body; // Get the new data from the request body
+    try {
+        const userId = req.user.userId; // Get ID from authenticated user
+        const { age } = req.body; // Get update data
 
-  try {
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      { username, email, age },
-      { new: true, runValidators: true } // Return the updated document and validate updates
-    );
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { age },
+            { new: true, runValidators: true }
+        ).select('-password -refreshTokens -otp -otpExpires');
 
-    if (!updatedUser) {
-      return res.status(404).json({ error: "User not found." });
+        if (!updatedUser) {
+            return res.status(404).json({
+                success: false,
+                error: 'User not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error('Update error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update user'
+        });
     }
-
-    res.status(200).json({ message: "User updated successfully.", updatedUser });
-  } catch (err) {
-    console.error("Error updating user:", err);
-    res.status(500).json({ error: "Server error. Please try again later." });
-  }
 };
 
 exports.deleteUser = async (req, res) => {

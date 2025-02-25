@@ -2,6 +2,7 @@ const axios = require('axios');
 const Accommodation = require("../models/Accommodation");
 const Booking = require("../models/Booking");
 const amadeusService = require('../services/amadeusService');
+const xoteloService = require('../services/xoteloService');
 
 // Create a new accommodation
 exports.createAccommodation = async (req, res) => {
@@ -67,88 +68,52 @@ exports.deleteAccommodation = async (req, res) => {
 exports.searchHotels = async (req, res) => {
     try {
         const { 
-            cityCode, 
-            checkInDate, 
-            checkOutDate, 
-            adults = 2,
-            roomQuantity = 1,
-            amenities,
-            ratings,
-            currency = 'USD'
+            locationKey,
+            checkIn,
+            checkOut,
+            rooms = 1,
+            adults = 1,
+            sortBy = 'best_value',
+            limit = 30,
+            offset = 0
         } = req.query;
 
-        if (!cityCode || !checkInDate || !checkOutDate) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required parameters'
-            });
-        }
+        // Get hotels list
+        const hotelsList = await xoteloService.getHotelsList(locationKey, limit, offset, sortBy);
 
-        // Validate dates
-        const checkIn = new Date(checkInDate);
-        const checkOut = new Date(checkOutDate);
-        
-        if (checkIn >= checkOut) {
-            return res.status(400).json({
-                success: false,
-                error: 'Check-out date must be after check-in date'
-            });
-        }
+        // Get rates for each hotel
+        const hotelsWithRates = await Promise.all(
+            hotelsList.result.list.map(async (hotel) => {
+                try {
+                    const ratesData = await xoteloService.getHotelRates(
+                        hotel.key,
+                        checkIn,
+                        checkOut,
+                        rooms,
+                        adults
+                    );
+                    return {
+                        ...hotel,
+                        rates: ratesData.result.rates
+                    };
+                } catch (error) {
+                    console.error(`Failed to fetch rates for hotel ${hotel.key}:`, error);
+                    return {
+                        ...hotel,
+                        rates: []
+                    };
+                }
+            })
+        );
 
-        // First ensure we have a valid token
-        await amadeusService.ensureValidToken();
-
-        // Get hotels
-        const hotelsResponse = await amadeusService.searchHotels({
-            cityCode,
-            radius: 5,
-            radiusUnit: 'KM',
-            ratings,
-            amenities: amenities ? amenities.split(',') : undefined,
-            hotelSource: 'ALL'
-        });
-
-        if (!hotelsResponse.data || !hotelsResponse.data.length) {
-            return res.status(200).json({
-                success: true,
-                hotels: []
-            });
-        }
-
-        // Get hotel offers
-        const offers = await amadeusService.getHotelOffers({
-            hotelIds: hotelsResponse.data.map(h => h.hotelId).join(','),
-            adults: parseInt(adults),
-            checkInDate,
-            checkOutDate,
-            roomQuantity: parseInt(roomQuantity),
-            currency
-        });
-
-        // Format response
-        const hotels = hotelsResponse.data.map(hotel => {
-            const hotelOffers = offers.data.find(o => o.hotel.hotelId === hotel.hotelId);
-            return {
-                id: hotel.hotelId,
-                name: hotel.name,
-                location: {
-                    cityCode: hotel.cityCode,
-                    latitude: hotel.geoCode?.latitude,
-                    longitude: hotel.geoCode?.longitude
-                },
-                rating: hotel.rating,
-                amenities: hotel.amenities,
-                offers: hotelOffers?.offers || []
-            };
-        });
-
-        res.status(200).json({
+        res.json({
             success: true,
-            hotels
+            hotels: hotelsWithRates,
+            total: hotelsList.result.total_count
         });
 
     } catch (error) {
-        console.error('Hotel search error:', error.response?.data || error);
+        console.error('Hotel search error:', error);
         res.status(500).json({
             success: false,
             error: 'Failed to search hotels'
@@ -156,37 +121,73 @@ exports.searchHotels = async (req, res) => {
     }
 };
 
+// Get hotel price heatmap
+exports.getHotelPriceHeatmap = async (req, res) => {
+    try {
+        const { hotelKey, checkOut } = req.query;
+        const heatmapData = await xoteloService.getHotelHeatmap(hotelKey, checkOut);
+        
+        res.json({
+            success: true,
+            heatmap: heatmapData.result.heatmap
+        });
+    } catch (error) {
+        console.error('Heatmap fetch error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch price heatmap'
+        });
+    }
+};
+
 // Book a hotel
 exports.bookHotel = async (req, res) => {
-    const { hotelId, checkIn, checkOut, guests, vendor, price, tax } = req.body;
-    const userId = req.user._id;
-
     try {
-        const booking = new Booking({
-            userId,
-            hotelId,
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                error: "Authentication required"
+            });
+        }
+
+        const {
+            hotelKey,
+            hotelName,
             checkIn,
             checkOut,
             guests,
-            vendor,
+            price
+        } = req.body;
+
+        const booking = new Booking({
+            userId: req.user.userId,
+            hotelKey,
+            hotelName,
+            checkIn: new Date(checkIn),
+            checkOut: new Date(checkOut),
+            guests,
             price,
-            tax,
-            status: 'confirmed',
-            type: 'hotel'
+            status: 'confirmed'
         });
 
         await booking.save();
 
         res.status(200).json({
             success: true,
-            message: 'Hotel booked successfully',
-            booking
+            message: "Booking confirmed successfully",
+            booking: {
+                id: booking._id,
+                hotelName: booking.hotelName,
+                checkIn: booking.checkIn,
+                checkOut: booking.checkOut,
+                price: booking.price
+            }
         });
     } catch (error) {
         console.error('Booking error:', error);
         res.status(500).json({
             success: false,
-            error: 'Failed to book hotel'
+            error: 'Failed to process booking'
         });
     }
 };

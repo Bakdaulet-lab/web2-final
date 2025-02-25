@@ -26,8 +26,14 @@
             <form id="hotelSearchForm" class="search-form">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="city">City</label>
-                        <input type="text" id="city" class="form-input" required>
+                        <label for="city">Location</label>
+                        <select id="locationKey" class="form-input" required>
+                            <option value="g293916">Bangkok</option>
+                            <option value="g294265">Singapore</option>
+                            <option value="g298184">Tokyo</option>
+                            <option value="g60763">New York</option>
+                            <option value="g186338">London</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="checkIn">Check-in</label>
@@ -81,19 +87,11 @@
                 <h3>Book Hotel</h3>
                 <div id="selectedHotelInfo"></div>
                 <form id="bookingForm">
-                    <input type="hidden" id="hotelId">
-                    <input type="hidden" id="offerId">
                     <div class="form-group">
                         <label>Guest Information</label>
                         <input type="text" id="guestName" placeholder="Full Name" required>
                         <input type="email" id="guestEmail" placeholder="Email" required>
                         <input type="tel" id="guestPhone" placeholder="Phone" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Payment Information</label>
-                        <input type="text" id="cardNumber" placeholder="Card Number" required>
-                        <input type="text" id="cardExpiry" placeholder="MM/YY" required>
-                        <input type="text" id="cardCvc" placeholder="CVC" required>
                     </div>
                     <div class="price-summary">
                         <div>Room Rate: <span id="roomRate"></span></div>
@@ -108,6 +106,7 @@
 
     <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../services/ToastService.js"></script>
     <script src="../services/HotelService.js"></script>
     <script>
         let currentHotels = [];
@@ -156,45 +155,33 @@
                     </div>
                 `;
 
-                const checkIn = new Date(document.getElementById('checkIn').value);
-                const checkOut = new Date(document.getElementById('checkOut').value);
-                
-                if (checkIn >= checkOut) {
-                    ToastService.error('Check-out date must be after check-in date');
-                    return;
-                }
-
                 const searchParams = {
-                    city: document.getElementById('city').value,
+                    locationKey: document.getElementById('locationKey').value,
                     checkIn: document.getElementById('checkIn').value,
                     checkOut: document.getElementById('checkOut').value,
                     adults: document.getElementById('guests').value,
                     rooms: document.getElementById('rooms').value,
-                    amenities: Array.from(document.getElementById('amenities').selectedOptions).map(o => o.value),
-                    ratings: document.getElementById('ratings').value,
-                    currency: 'USD'
                 };
 
+                console.log('Sending search params:', searchParams); // Debug log
+
                 const response = await HotelService.searchHotels(searchParams);
+                console.log('Search response:', response); // Debug log
 
                 if (response.success) {
-                    currentHotels = response.hotels;
-                    displayHotels(response.hotels);
+                    if (response.hotels && response.hotels.length > 0) {
+                        displayHotels(response.hotels);
+                    } else {
+                        resultsSection.innerHTML = '<div class="no-results">No hotels found for your search criteria.</div>';
+                    }
                 } else {
-                    ToastService.error(response.error || 'No hotels found for your criteria');
-                    resultsSection.innerHTML = `
-                        <div class="no-results">
-                            <p>No hotels found matching your criteria.</p>
-                            <p>Try adjusting your search filters.</p>
-                        </div>
-                    `;
+                    throw new Error(response.error || 'Failed to find hotels');
                 }
             } catch (error) {
                 console.error('Search error:', error);
-                ToastService.error(error.message || 'Failed to search hotels');
                 resultsSection.innerHTML = `
-                    <div class="error-state">
-                        <p>Unable to complete your search at this time.</p>
+                    <div class="error-message">
+                        <p>${error.message || 'Failed to search hotels'}</p>
                         <button class="btn btn-secondary" onclick="retrySearch()">Try Again</button>
                     </div>
                 `;
@@ -212,32 +199,35 @@
 
             try {
                 const bookingData = {
-                    hotelId: document.getElementById('hotelId').value,
-                    offerId: document.getElementById('offerId').value,
+                    hotelKey: selectedHotel.key,
+                    hotelName: selectedHotel.name,
+                    checkIn: document.getElementById('checkIn').value,
+                    checkOut: document.getElementById('checkOut').value,
                     guests: [{
                         name: document.getElementById('guestName').value,
                         email: document.getElementById('guestEmail').value,
                         phone: document.getElementById('guestPhone').value
                     }],
-                    payment: {
-                        cardNumber: document.getElementById('cardNumber').value,
-                        expiryDate: document.getElementById('cardExpiry').value,
-                        cvc: document.getElementById('cardCvc').value
+                    price: {
+                        amount: selectedHotel.rates[0].rate,
+                        currency: 'USD',
+                        vendor: selectedHotel.rates[0].name
                     }
                 };
 
                 const response = await HotelService.bookHotel(bookingData);
+                
                 if (response.success) {
                     ToastService.success('Booking confirmed successfully!');
                     document.getElementById('bookingModal').style.display = 'none';
-                    // Optionally redirect to booking confirmation page
-                    // window.location.href = `/pages/booking-confirmation.html?id=${response.bookingId}`;
+                    // Redirect to booking confirmation
+                    window.location.href = `/pages/booking-confirmation.html?id=${response.booking.id}`;
                 } else {
-                    ToastService.error(response.error || 'Booking failed');
+                    throw new Error(response.error || 'Booking failed');
                 }
             } catch (error) {
                 console.error('Booking error:', error);
-                ToastService.error('Unable to complete booking. Please try again.');
+                ToastService.error(error.message || 'Unable to complete booking. Please try again.');
             } finally {
                 bookingButton.disabled = false;
             }
@@ -251,26 +241,32 @@
             selectedHotel = hotel;
             const modal = document.getElementById('bookingModal');
             
-            document.getElementById('hotelId').value = hotel.id;
-            document.getElementById('offerId').value = offer.id;
-            document.getElementById('roomRate').textContent = HotelService.formatPrice(offer.price.base);
-            document.getElementById('taxAmount').textContent = HotelService.formatPrice(offer.price.taxes[0]?.amount || 0);
-            document.getElementById('totalAmount').textContent = HotelService.formatPrice(offer.price.total);
+            // Calculate tax (10% for example)
+            const taxRate = 0.1;
+            const basePrice = offer.rate;
+            const taxAmount = basePrice * taxRate;
+            const totalAmount = basePrice + taxAmount;
 
+            // Update modal content
             document.getElementById('selectedHotelInfo').innerHTML = `
                 <div class="hotel-summary">
                     <h4>${hotel.name}</h4>
-                    <p>${offer.room.description}</p>
+                    <p>Best price via ${offer.name}</p>
                 </div>
             `;
+
+            document.getElementById('roomRate').textContent = HotelService.formatPrice(basePrice);
+            document.getElementById('taxAmount').textContent = HotelService.formatPrice(taxAmount);
+            document.getElementById('totalAmount').textContent = HotelService.formatPrice(totalAmount);
 
             modal.style.display = 'block';
         }
 
         function displayHotels(hotels) {
+            console.log('Displaying hotels:', hotels); // Debug log
             const resultsSection = document.getElementById('hotelResults');
             
-            if (!hotels.length) {
+            if (!hotels || !hotels.length) {
                 resultsSection.innerHTML = '<div class="no-results">No hotels found.</div>';
                 return;
             }
@@ -281,18 +277,27 @@
                     <div class="hotel-card">
                         <div class="hotel-header">
                             <h3>${hotel.name}</h3>
-                            <p class="location">${hotel.location.cityCode}</p>
+                            <div class="hotel-rating">
+                                ${hotel.review_summary ? 
+                                    `<span class="rating">${hotel.review_summary.rating}/5</span>
+                                     <span class="review-count">(${hotel.review_summary.count} reviews)</span>` 
+                                    : ''}
+                            </div>
+                        </div>
+                        <div class="hotel-amenities">
+                            ${hotel.highlighted_amenities ? 
+                                hotel.highlighted_amenities.map(a => 
+                                    `<span class="amenity-tag">${a.name}</span>`
+                                ).join('') 
+                                : ''}
                         </div>
                         <div class="hotel-content">
                             ${bestPrice ? `
                                 <div class="price-info">
                                     <div class="best-price">
                                         <span class="price-label">Best Price</span>
-                                        <span class="price-amount">${HotelService.formatPrice(bestPrice.price.total)}</span>
-                                        ${bestPrice.price.taxes[0] ? 
-                                            `<span class="tax-amount">+${HotelService.formatPrice(bestPrice.price.taxes[0].amount)} tax</span>` 
-                                            : ''
-                                        }
+                                        <span class="price-amount">${HotelService.formatPrice(bestPrice.rate)}</span>
+                                        <span class="price-vendor">via ${bestPrice.name}</span>
                                     </div>
                                     <button class="btn btn-primary" onclick='showBookingModal(${JSON.stringify(hotel)}, ${JSON.stringify(bestPrice)})'>
                                         Book Now
@@ -305,10 +310,22 @@
             }).join('');
 
             resultsSection.innerHTML = `
-                <h3>Found ${hotels.length} hotels in ${document.getElementById('city').value}</h3>
+                <h3>Found ${hotels.length} hotels in ${document.getElementById('locationKey').options[document.getElementById('locationKey').selectedIndex].text}</h3>
                 <div class="hotels-grid">${html}</div>
             `;
         }
+
+        // Close modal functionality
+        document.querySelector('.close').onclick = () => {
+            document.getElementById('bookingModal').style.display = 'none';
+        };
+
+        window.onclick = (event) => {
+            const modal = document.getElementById('bookingModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        };
     </script>
 </body>
 </html>

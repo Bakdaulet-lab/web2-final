@@ -1,4 +1,3 @@
-/profile.html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -23,71 +22,163 @@
     <main class="main-content">
         <div class="profile-container">
             <h2>My Profile</h2>
-            <div id="profileInfo" class="profile-info">
-                <div class="profile-section">
-                    <h3>Personal Information</h3>
-                    <form id="profileForm" class="form-container">
+            
+            <!-- Error State Container -->
+            <div id="errorContainer" class="error-state" style="display: none;">
+                <p id="errorMessage"></p>
+                <button class="btn btn-secondary retry-button" onclick="retryLoadProfile()">Try Again</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading profile...</p>
+            </div>
+
+            <!-- Profile Content -->
+            <div id="profileInfo" class="profile-info" style="display: none;">
+                <div class="user-details">
+                    <form id="profileForm">
                         <div class="form-group">
-                            <label for="username" class="form-label">Username</label>
+                            <label for="username">Username</label>
                             <input type="text" id="username" class="form-input" readonly>
                         </div>
                         <div class="form-group">
-                            <label for="email" class="form-label">Email</label>
+                            <label for="email">Email</label>
                             <input type="email" id="email" class="form-input" readonly>
                         </div>
                         <div class="form-group">
-                            <label for="age" class="form-label">Age</label>
+                            <label for="age">Age</label>
                             <input type="number" id="age" class="form-input">
                         </div>
                         <button type="submit" class="btn">Update Profile</button>
                     </form>
                 </div>
-
-                <div class="profile-section">
+                <div class="user-bookings">
                     <h3>My Bookings</h3>
-                    <div id="userBookings" class="bookings-list">
-                        <!-- Bookings will be loaded here -->
-                    </div>
+                    <div id="userBookings"></div>
                 </div>
             </div>
         </div>
     </main>
 
-    <script src="../js/api.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../services/ToastService.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
+        document.addEventListener('DOMContentLoaded', loadProfile);
+
+        async function loadProfile() {
             if (!AuthService.isAuthenticated()) {
                 window.location.href = '/pages/login.html';
                 return;
             }
 
-            try {
-                // Load user profile
-                const profile = await ApiService.request('/profile');
-                document.getElementById('username').value = profile.user.username;
-                document.getElementById('email').value = profile.user.email;
-                document.getElementById('age').value = profile.user.age;
+            showLoading();
 
-                // Load user bookings
-                const bookings = await ApiService.getUserBookings();
-                const bookingsHtml = bookings.map(booking => `
-                    <div class="booking-card">
-                        <h4>${booking.excursionId?.name || 'Unnamed Excursion'}</h4>
-                        <p>Date: ${new Date(booking.bookingDate).toLocaleDateString()}</p>
-                        <p>Status: ${booking.status}</p>
-                    </div>
-                `).join('');
-                document.getElementById('userBookings').innerHTML = bookingsHtml;
+            try {
+                const [profileResponse, bookingsResponse] = await Promise.all([
+                    ApiService.request('/profile'),
+                    ApiService.request('/bookings/user')
+                ]);
+
+                hideLoading();
+
+                if (!profileResponse.success) {
+                    throw new Error(profileResponse.error || 'Failed to load profile');
+                }
+
+                displayProfile(profileResponse.user);
+                
+                if (bookingsResponse.success) {
+                    displayBookings(bookingsResponse.bookings);
+                }
+
+                document.getElementById('profileInfo').style.display = 'block';
             } catch (error) {
                 console.error('Error loading profile:', error);
-                alert('Failed to load profile information.');
+                showError(error.message || 'Failed to load profile information');
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('profileInfo').style.display = 'none';
+            document.getElementById('errorContainer').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorContainer').style.display = 'block';
+            document.getElementById('profileInfo').style.display = 'none';
+            hideLoading();
+        }
+
+        function displayProfile(user) {
+            if (!user) {
+                showError('User data not found');
+                return;
+            }
+
+            document.getElementById('username').value = user.username || '';
+            document.getElementById('email').value = user.email || '';
+            document.getElementById('age').value = user.age || '';
+        }
+
+        function displayBookings(bookings) {
+            const bookingsHtml = bookings.length ? bookings.map(booking => `
+                <div class="booking-card">
+                    <h4>${booking.flightNumber || booking.hotelName || 'Booking'}</h4>
+                    <p>Date: ${new Date(booking.bookingDate).toLocaleDateString()}</p>
+                    <p>Status: ${booking.status}</p>
+                </div>
+            `).join('') : '<p class="no-bookings">No bookings found</p>';
+
+            document.getElementById('userBookings').innerHTML = bookingsHtml;
+        }
+
+        function retryLoadProfile() {
+            loadProfile();
+        }
+
+        // Handle form submission
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitButton = e.target.querySelector('button[type="submit"]');
+            
+            try {
+                submitButton.disabled = true;
+                
+                const updatedProfile = {
+                    age: document.getElementById('age').value
+                };
+
+                const response = await ApiService.request('/profile', {
+                    method: 'PUT',
+                    body: JSON.stringify(updatedProfile)
+                });
+
+                if (response.success) {
+                    ToastService.success('Profile updated successfully');
+                } else {
+                    throw new Error(response.error || 'Failed to update profile');
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                ToastService.error(error.message || 'Failed to update profile');
+            } finally {
+                submitButton.disabled = false;
             }
         });
 
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
-            AuthService.logout();
+            AuthService.clearTokens();
+            window.location.href = '/pages/login.html';
         });
     </script>
 </body>

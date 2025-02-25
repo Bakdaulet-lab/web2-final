@@ -1,9 +1,10 @@
 // controllers/flightController.js
-const Flight = require("../models/Flight");
-const FlightBooking = require('../models/FlightBooking'); // Changed from Flight to FlightBooking
-const User = require('../models/Users'); // Changed from User to Users
+const { Flight } = require("../models/Flight");
+const FlightBooking = require('../models/FlightBooking');
+const User = require('../models/Users');
 const { sendBookingConfirmation } = require('../utils/emailService');
-const { authenticate } = require('../middlewares/auth'); // Update path
+const { authenticate } = require('../middlewares/auth');
+const fetch = require('node-fetch');
 
 // Create a new flight
 exports.createFlight = async (req, res) => {
@@ -33,27 +34,41 @@ exports.getFlights = async (req, res) => {
     try {
         const { origin, destination, departureDate, passengers, priceRange, stops } = req.query;
 
-        let query = {
-            origin,
-            destination,
-            departureTime: { $gte: new Date(departureDate) },
-            seats: { $gte: parseInt(passengers) }
-        };
+        // Basic query conditions
+        let query = {};
 
-        if (stops !== 'any') {
-            query.stops = parseInt(stops);
+        // Add filters only if they are provided
+        if (origin) query.origin = origin;
+        if (destination) query.destination = destination;
+        if (departureDate) {
+            query.departureTime = { 
+                $gte: new Date(departureDate),
+                $lt: new Date(new Date(departureDate).setDate(new Date(departureDate).getDate() + 1))
+            };
+        }
+        if (passengers) {
+            query.seats = { $gte: parseInt(passengers) || 1 };
         }
 
-        if (priceRange !== 'any') {
-            const [min, max] = priceRange.split('-').map(Number);
-            query.price = { $gte: min, $lte: max };
-        }
+        // Make sure we have some flights in the database
+        const flights = await Flight.find(query).sort({ departureTime: 1 });
 
-        const flights = await Flight.find(query);
+        // Add debug logging
+        console.log('Search Query:', query);
+        console.log('Found Flights:', flights);
 
         res.status(200).json({
             success: true,
-            flights
+            flights: flights,
+            meta: {
+                total: flights.length,
+                filters: {
+                    origin,
+                    destination,
+                    departureDate,
+                    passengers: parseInt(passengers) || 1
+                }
+            }
         });
     } catch (error) {
         console.error('Error fetching flights:', error);
@@ -105,8 +120,16 @@ exports.bookFlight = async (req, res) => {
             paymentDetails
         } = req.body;
 
-        // Validate flight availability
-        const flight = await Flight.findById(flightDetails.flightId);
+        // Check authentication
+        if (!req.user || !req.user.userId) {
+            return res.status(401).json({
+                success: false,
+                error: 'Authentication required'
+            });
+        }
+
+        // Find flight by flightNumber
+        const flight = await Flight.findOne({ flightNumber: flightDetails.flightNumber });
         if (!flight || flight.seats < 1) {
             return res.status(400).json({
                 success: false,
@@ -116,10 +139,17 @@ exports.bookFlight = async (req, res) => {
 
         // Create booking record
         const booking = new FlightBooking({
-            userId: req.user._id,
+            userId: req.user.userId, // Get userId from authenticated user
             flightDetails: {
-                ...flightDetails,
-                flightId: flight._id // Use MongoDB _id
+                flightId: flight._id,
+                airline: flight.airline,
+                flightNumber: flight.flightNumber,
+                origin: flight.origin,
+                destination: flight.destination,
+                departureTime: flight.departureTime,
+                arrivalTime: flight.arrivalTime,
+                class: flight.class,
+                price: flight.price
             },
             passengerDetails,
             paymentDetails: {
@@ -137,18 +167,18 @@ exports.bookFlight = async (req, res) => {
         flight.seats -= 1;
         await flight.save();
 
-        // Send confirmation email
+        // Send booking confirmation email
         try {
             await sendBookingConfirmation(passengerDetails.email, booking);
         } catch (emailError) {
-            console.error('Email sending failed:', emailError);
-            // Continue with booking success even if email fails
+            console.error('Email sending error:', emailError);
+            // Continue with booking process even if email fails
         }
 
         res.status(200).json({
             success: true,
             message: 'Flight booked successfully',
-            bookingId: booking._id
+            booking: booking
         });
 
     } catch (error) {
@@ -172,6 +202,67 @@ exports.getUserBookings = async (req, res) => {
         res.status(500).json({
             success: false,
             error: 'Failed to fetch bookings'
+        });
+    }
+};
+
+// Modify searchFlights to use proper async/await handling
+exports.searchFlights = async (req, res) => {
+    try {
+        const { origin, destination, departureDate, passengers } = req.query;
+
+        if (!origin || !destination || !departureDate) {
+            return res.status(400).json({
+                success: false,
+                error: 'Missing required search parameters'
+            });
+        }
+
+        const API_KEY = '02a6ce2ddbad9a9f40d8b514e51da21e'; // Your Aviation Stack API key
+        const url = `http://api.aviationstack.com/v1/flights?access_key=${API_KEY}&dep_iata=${origin}&arr_iata=${destination}&flight_date=${departureDate}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'Failed to fetch flights');
+        }
+
+        let flights = [];
+        if (data.data && Array.isArray(data.data)) {
+            flights = data.data.map(flight => ({
+                flightNumber: flight.flight?.number || 'N/A',
+                airline: flight.airline?.name || 'N/A',
+                origin: flight.departure?.iata || origin,
+                destination: flight.arrival?.iata || destination,
+                departureTime: flight.departure?.scheduled || departureDate,
+                arrivalTime: flight.arrival?.scheduled,
+                price: Math.floor(Math.random() * (1000 - 200) + 200),
+                seats: Math.floor(Math.random() * 50) + 1,
+                aircraft: flight.aircraft?.registration || 'N/A',
+                terminal: flight.departure?.terminal || 'TBD',
+                gate: flight.departure?.gate || 'TBD'
+            }));
+        }
+
+        return res.status(200).json({
+            success: true,
+            flights,
+            meta: {
+                total: flights.length,
+                origin,
+                destination,
+                departureDate,
+                passengers: parseInt(passengers) || 1
+            }
+        });
+
+    } catch (error) {
+        console.error('Flight search error:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Failed to search flights',
+            message: error.message
         });
     }
 };

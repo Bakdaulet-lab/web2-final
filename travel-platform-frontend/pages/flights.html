@@ -27,15 +27,25 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="origin">From</label>
-                        <select id="origin" class="form-input" required>
-                            <option value="">Select City</option>
-                        </select>
+                        <input type="text" 
+                               id="origin" 
+                               class="form-input" 
+                               placeholder="Airport code (e.g., LAX)" 
+                               required 
+                               pattern="[A-Z]{3}"
+                               maxlength="3"
+                               title="Please enter a valid 3-letter IATA airport code">
                     </div>
                     <div class="form-group">
                         <label for="destination">To</label>
-                        <select id="destination" class="form-input" required>
-                            <option value="">Select City</option>
-                        </select>
+                        <input type="text" 
+                               id="destination" 
+                               class="form-input" 
+                               placeholder="Airport code (e.g., JFK)" 
+                               required
+                               pattern="[A-Z]{3}"
+                               maxlength="3"
+                               title="Please enter a valid 3-letter IATA airport code">
                     </div>
                     <div class="form-group">
                         <label for="departureDate">Departure Date</label>
@@ -106,10 +116,24 @@
 
     <script src="../data/flightData.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../services/ToastService.js"></script>
+    <script src="../services/FlightService.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!AuthService.isAuthenticated()) {
+                window.location.href = '/pages/login.html';
+                return;
+            }
+            setupEventListeners();
+        });
+    </script>
+    <script src="../js/api.js"></script>
+    <script src="../services/FlightService.js"></script>
     <script>
         let selectedFlight = null;
 
         document.addEventListener('DOMContentLoaded', () => {
+            ToastService.init(); // Initialize ToastService
             if (!AuthService.isAuthenticated()) {
                 window.location.href = '/pages/login.html';
                 return;
@@ -147,35 +171,63 @@
             });
         }
 
-        function handleSearch(e) {
+        async function handleSearch(e) {
             e.preventDefault();
-            const origin = document.getElementById('origin').value;
-            const destination = document.getElementById('destination').value;
-            const priceRange = document.getElementById('priceRange').value;
-            const stops = document.getElementById('stops').value;
+            const searchButton = e.target.querySelector('button[type="submit"]');
+            searchButton.disabled = true;
+            
+            const resultsSection = document.getElementById('flightResults');
+            resultsSection.innerHTML = `
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>Searching flights...</p>
+                </div>
+            `;
 
-            let filtered = flightData.filter(flight => 
-                flight.origin === origin && 
-                flight.destination === destination
-            );
+            try {
+                const searchParams = {
+                    origin: document.getElementById('origin').value.toUpperCase(),
+                    destination: document.getElementById('destination').value.toUpperCase(),
+                    departureDate: document.getElementById('departureDate').value,
+                    passengers: document.getElementById('passengers').value,
+                    priceRange: document.getElementById('priceRange').value || undefined,
+                    stops: document.getElementById('stops').value || undefined
+                };
 
-            if (priceRange) {
-                const [min, max] = priceRange.split('-').map(p => p === '+' ? Infinity : Number(p));
-                filtered = filtered.filter(f => f.price >= min && f.price <= (max || Infinity));
+                if (!searchParams.origin || !searchParams.destination || !searchParams.departureDate) {
+                    throw new Error('Please fill in all required fields');
+                }
+
+                const response = await FlightService.searchFlights(searchParams);
+                
+                if (response.success) {
+                    displayFlights(response.flights);
+                } else {
+                    throw new Error(response.error || 'No flights found');
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                resultsSection.innerHTML = `
+                    <div class="error-state">
+                        <p>${error.message || 'Unable to complete your search at this time.'}</p>
+                        <button class="btn btn-secondary" onclick="window.location.reload()">Try Again</button>
+                    </div>
+                `;
+            } finally {
+                searchButton.disabled = false;
             }
-
-            if (stops !== '') {
-                filtered = filtered.filter(f => f.stops === Number(stops));
-            }
-
-            displayFlights(filtered);
         }
 
         function displayFlights(flights) {
             const resultsSection = document.getElementById('flightResults');
             
-            if (!flights.length) {
-                resultsSection.innerHTML = '<div class="no-results">No flights found matching your criteria.</div>';
+            if (!flights || flights.length === 0) {
+                resultsSection.innerHTML = `
+                    <div class="no-results">
+                        <h3>No Flights Found</h3>
+                        <p>Try adjusting your search criteria</p>
+                    </div>
+                `;
                 return;
             }
 
@@ -196,7 +248,7 @@
                                 <div class="flight-duration">
                                     <p>${calculateDuration(flight.departureTime, flight.arrivalTime)}</p>
                                     <div class="flight-line"></div>
-                                    ${flight.stops ? `<span class="stops">${flight.stops} stop</span>` : ''}
+                                    ${flight.stops ? `<span class="stops">${flight.stops} stop${flight.stops > 1 ? 's' : ''}</span>` : ''}
                                 </div>
                                 <div class="flight-time">
                                     <p class="time">${formatTime(flight.arrivalTime)}</p>
@@ -205,7 +257,7 @@
                             </div>
                             <div class="flight-footer">
                                 <div class="price-info">
-                                    <p class="price">$${flight.price}</p>
+                                    <p class="price">${formatPrice(flight.price)}</p>
                                     <p class="seats">${flight.seats} seats left</p>
                                 </div>
                                 <button class="btn btn-primary" onclick='showBookingModal(${JSON.stringify(flight)})'>
@@ -257,18 +309,15 @@
 
         async function handleBooking(e) {
             e.preventDefault();
-            if (!selectedFlight) return;
-
-            const bookingButton = e.target.querySelector('button[type="submit"]');
+            const form = e.target;
+            const bookingButton = form.querySelector('button[type="submit"]');
             bookingButton.disabled = true;
 
             try {
-                // Get form data
                 const bookingData = {
                     flightDetails: {
-                        flightId: selectedFlight.id,
+                        flightNumber: selectedFlight.flightNumber, // Use flightNumber instead of id
                         airline: selectedFlight.airline,
-                        flightNumber: selectedFlight.flightNumber,
                         origin: selectedFlight.origin,
                         destination: selectedFlight.destination,
                         departureTime: selectedFlight.departureTime,
@@ -277,42 +326,103 @@
                         price: selectedFlight.price
                     },
                     passengerDetails: {
-                        name: document.getElementById('passengerName').value,
-                        email: document.getElementById('passengerEmail').value,
-                        phone: document.getElementById('passengerPhone').value
+                        name: document.getElementById('passengerName').value.trim(),
+                        email: document.getElementById('passengerEmail').value.trim(),
+                        phone: document.getElementById('passengerPhone').value.trim()
                     },
                     paymentDetails: {
                         amount: selectedFlight.price,
                         tax: Math.round(selectedFlight.price * 0.1),
                         total: Math.round(selectedFlight.price * 1.1),
-                        cardNumber: document.getElementById('cardNumber').value,
-                        cardExpiry: document.getElementById('cardExpiry').value,
-                        cardCvc: document.getElementById('cardCvc').value
+                        cardNumber: document.getElementById('cardNumber').value.trim(),
+                        cardExpiry: document.getElementById('cardExpiry').value.trim(),
+                        cardCvc: document.getElementById('cardCvc').value.trim()
                     }
                 };
 
-                // Use FlightService to handle booking
-                const response = await FlightService.bookFlight(bookingData);
+                const errors = validateBookingData(bookingData);
+                if (Object.keys(errors).length > 0) {
+                    showFormErrors(errors);
+                    throw new Error('Please fill in all required fields correctly');
+                }
 
+                const response = await FlightService.bookFlight(bookingData);
                 if (response.success) {
-                    ToastService.success('Flight booked successfully! Check your email for confirmation.');
+                    ToastService.success('Flight booked successfully!');
                     document.getElementById('bookingModal').style.display = 'none';
-                    document.getElementById('bookingForm').reset();
-                    
-                    // Optionally refresh available seats
-                    await loadFlights();
                 } else {
                     throw new Error(response.error || 'Booking failed');
                 }
             } catch (error) {
                 console.error('Booking error:', error);
-                ToastService.error(error.message || 'Unable to complete booking. Please try again.');
+                ToastService.error(error.message || 'Unable to complete booking');
             } finally {
                 bookingButton.disabled = false;
             }
         }
+
+        function validateBookingData(data) {
+            const errors = {};
+            
+            // Passenger validation
+            if (!data.passengerDetails.name) {
+                errors.passengerName = 'Name is required';
+            }
+            if (!isValidEmail(data.passengerDetails.email)) {
+                errors.passengerEmail = 'Valid email is required';
+            }
+            if (!isValidPhone(data.passengerDetails.phone)) {
+                errors.passengerPhone = 'Valid phone number is required';
+            }
+
+            // Payment validation
+            if (!isValidCreditCard(data.paymentDetails.cardNumber)) {
+                errors.cardNumber = 'Valid card number is required';
+            }
+            if (!isValidExpiryDate(data.paymentDetails.cardExpiry)) {
+                errors.cardExpiry = 'Valid expiry date is required (MM/YY)';
+            }
+            if (!isValidCVC(data.paymentDetails.cardCvc)) {
+                errors.cardCvc = 'Valid CVC is required';
+            }
+
+            return errors;
+        }
+
+        function showFormErrors(errors) {
+            Object.entries(errors).forEach(([field, message]) => {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = message;
+                const input = document.getElementById(field);
+                input.parentNode.appendChild(errorDiv);
+                errorDiv.style.display = 'block';
+            });
+        }
+
+        function showError() {
+            const resultsSection = document.getElementById('flightResults');
+            resultsSection.innerHTML = `
+                <div class="error-state">
+                    <p>Unable to complete your search at this time.</p>
+                    <button class="btn btn-secondary" onclick="window.location.reload()">Try Again</button>
+                </div>
+            `;
+        }
+
+        function formatPrice(price) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(price);
+        }
     </script>
-    <script src="../services/FlightService.js"></script>
-    <script src="../services/ToastService.js"></script>
+    <script src="../services/AviationService.js"></script>
+    <script src="../js/flights.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // FlightUI initialization is handled in flights.js
+        });
+    </script>
 </body>
 </html>

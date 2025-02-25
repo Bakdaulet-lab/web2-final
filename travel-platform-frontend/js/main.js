@@ -93,3 +93,19 @@ async function handleBooking(e) {
         alert('Failed to book excursion. Please try again.');
     }
 }
+
+// Remove any itinerary-related functions and event listeners
+async function loadDashboardData() {
+    try {
+        // Remove itineraries fetch
+        const bookingsResponse = await ApiService.request('/bookings/user');
+
+        if (bookingsResponse.success && bookingsResponse.bookings) {
+            renderBookings(bookingsResponse.bookings);
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        NotificationService.error('Failed to load dashboard information');
+    }
+}
+

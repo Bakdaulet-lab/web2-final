@@ -37,22 +37,19 @@ class FlightService {
 
     static async searchFlights(params) {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                throw new Error('Authentication required');
-            }
-
-            const queryParams = new URLSearchParams({
+            const queryString = new URLSearchParams({
                 origin: params.origin,
                 destination: params.destination,
                 departureDate: params.departureDate,
-                passengers: params.passengers,
+                passengers: params.passengers || 1,
                 priceRange: params.priceRange,
                 stops: params.stops
-            });
+            }).toString();
 
-            const response = await fetch(`${ApiService.BASE_URL}/flights?${queryParams}`, {
-                method: 'GET',
+            // Try to refresh token if expired
+            const token = await AuthService.getValidToken();
+
+            const response = await fetch(`http://localhost:3000/api/flights?${queryString}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -60,13 +57,14 @@ class FlightService {
             });
 
             const data = await response.json();
+
             if (!response.ok) {
                 throw new Error(data.error || 'Failed to fetch flights');
             }
 
             return data;
         } catch (error) {
-            console.error('Error searching flights:', error);
+            console.error('Flight search error:', error);
             throw error;
         }
     }

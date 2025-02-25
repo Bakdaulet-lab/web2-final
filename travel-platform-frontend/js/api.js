@@ -3,8 +3,26 @@ class ApiService {
 
     static async request(endpoint, options = {}) {
         try {
-            const token = AuthService.getToken();
+            let token = AuthService.getAccessToken();
             
+            // If token exists and is expired, try to refresh
+            if (token && AuthService.isTokenExpired(token)) {
+                try {
+                    const refreshToken = AuthService.getRefreshToken();
+                    if (refreshToken) {
+                        const refreshResponse = await this.refreshToken(refreshToken);
+                        if (refreshResponse.success) {
+                            AuthService.setTokens(refreshResponse.accessToken, refreshResponse.refreshToken);
+                            token = refreshResponse.accessToken;
+                        }
+                    }
+                } catch (error) {
+                    AuthService.clearTokens();
+                    window.location.href = '/pages/login.html';
+                    throw new Error('Session expired. Please login again.');
+                }
+            }
+
             const headers = {
                 'Content-Type': 'application/json',
                 ...(token && { 'Authorization': `Bearer ${token}` })
@@ -18,13 +36,17 @@ class ApiService {
                 }
             });
 
-            const data = await response.json();
-
             if (!response.ok) {
-                throw new Error(data.error || 'API request failed');
+                if (response.status === 401) {
+                    AuthService.clearTokens();
+                    window.location.href = '/pages/login.html';
+                    throw new Error('Session expired. Please login again.');
+                }
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Request failed');
             }
 
-            return data;
+            return await response.json();
         } catch (error) {
             console.error('API request failed:', error);
             throw error;
@@ -67,23 +89,44 @@ class ApiService {
 
     static async register(userData) {
         try {
-            const response = await fetch(`${this.BASE_URL}/register`, {
+            const response = await fetch(`${this.BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(userData),
-                credentials: 'include'
+                body: JSON.stringify(userData)
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Registration failed');
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Registration error:', error);
+            throw error;
+        }
+    }
+
+    static async refreshToken(refreshToken) {
+        try {
+            const response = await fetch(`${this.BASE_URL}/auth/refresh`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ refreshToken })
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Registration failed');
+                throw new Error('Token refresh failed');
             }
 
             return await response.json();
         } catch (error) {
-            console.error('Registration error:', error);
+            console.error('Token refresh error:', error);
             throw error;
         }
     }
@@ -126,25 +169,6 @@ class ApiService {
         return this.request('/payments/transactions');
     }
 
-    // Add itinerary endpoints
-    static async getUserItineraries() {
-        return this.request('/itineraries');
-    }
-
-    static async createItinerary(itineraryData) {
-        return this.request('/itineraries', {
-            method: 'POST',
-            body: JSON.stringify(itineraryData)
-        });
-    }
-
-    static async updateItinerary(itineraryId, updates) {
-        return this.request(`/itineraries/${itineraryId}`, {
-            method: 'PUT',
-            body: JSON.stringify(updates)
-        });
-    }
-
     // Add accommodation endpoints
     static async getAccommodations() {
         return this.request('/accommodations');
@@ -179,5 +203,24 @@ class ApiService {
                 ...flightData
             })
         });
+    }
+
+    // Itinerary endpoints
+    static async createItinerary(itineraryData) {
+        return this.request('/itineraries', {
+            method: 'POST',
+            body: JSON.stringify(itineraryData)
+        });
+    }
+
+    static async updateItinerary(itineraryId, updates) {
+        return this.request(`/itineraries/${itineraryId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates)
+        });
+    }
+
+    static async getUserItineraries() {
+        return this.request('/itineraries');
     }
 }

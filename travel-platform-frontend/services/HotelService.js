@@ -1,34 +1,54 @@
 class HotelService {
     static async searchHotels(params) {
         try {
-            const response = await ApiService.request('/hotels/search', {
-                method: 'GET',
-                params: {
-                    cityCode: params.city,
-                    checkInDate: params.checkIn,
-                    checkOutDate: params.checkOut,
-                    adults: params.adults,
-                    roomQuantity: params.rooms,
-                    amenities: params.amenities?.join(','),
-                    ratings: params.ratings,
-                    currency: params.currency
+            const queryString = new URLSearchParams({
+                locationKey: params.locationKey,
+                checkIn: params.checkIn,
+                checkOut: params.checkOut,
+                rooms: params.rooms || 1,
+                adults: params.adults || 2,
+                sortBy: params.sortBy || 'best_value',
+                limit: params.limit || 30,
+                offset: params.offset || 0
+            }).toString();
+
+            const response = await fetch(`http://localhost:3000/api/hotels/search?${queryString}`, {
+                headers: {
+                    'Authorization': `Bearer ${AuthService.getAccessToken()}`
                 }
             });
 
-            return response;
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to search hotels');
+            }
+
+            return data;
         } catch (error) {
             console.error('Hotel search error:', error);
-            throw new Error(error.response?.data?.message || 'Failed to search hotels');
+            throw error;
         }
     }
 
     static async bookHotel(bookingData) {
         try {
-            const response = await ApiService.request('/hotels/book', {
+            const response = await fetch('http://localhost:3000/api/hotels/book', {
                 method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${AuthService.getAccessToken()}`
+                },
                 body: JSON.stringify(bookingData)
             });
-            return response;
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Booking failed');
+            }
+
+            return data;
         } catch (error) {
             console.error('Error booking hotel:', error);
             throw error;
@@ -36,12 +56,11 @@ class HotelService {
     }
 
     static getBestPrice(hotel) {
-        if (!hotel.offers || hotel.offers.length === 0) return null;
+        if (!hotel.rates || hotel.rates.length === 0) return null;
         
-        return hotel.offers.reduce((min, offer) => {
-            const total = parseFloat(offer.price.total);
-            return total < parseFloat(min.price.total) ? offer : min;
-        }, hotel.offers[0]);
+        return hotel.rates.reduce((min, rate) => {
+            return rate.rate < min.rate ? rate : min;
+        }, hotel.rates[0]);
     }
 
     static formatPrice(price, currency = 'USD') {
@@ -50,16 +69,6 @@ class HotelService {
             currency: currency
         }).format(price);
     }
-
-    static async getCityCode(cityName) {
-        try {
-            const response = await ApiService.request('/hotels/city-code', {
-                params: { city: cityName }
-            });
-            return response.cityCode;
-        } catch (error) {
-            console.error('Error getting city code:', error);
-            throw error;
-        }
-    }
 }
+
+window.HotelService = HotelService;
